@@ -1,0 +1,440 @@
+# api.http — REST Client para VS Code
+# Extensão: REST Client (humao.rest-client)
+#
+# Como usar:
+#   1. Instale a extensão "REST Client" no VS Code
+#   2. Defina @token com o JWT do Supabase (veja Login abaixo)
+#   3. Clique em "Send Request" acima de cada bloco
+#
+# Fluxo recomendado:
+#   1. Health → 2. Login → copie o token → 3. Criar projeto → copiar ID →
+#   4. Upload → 5. Status → 6. Chat → 7. Histórico → 8. Deletar
+
+# ── Variáveis globais ──────────────────────────────────────────────────────────
+@baseUrl     = http://localhost:8000
+@contentType = application/json
+
+# Após fazer login, cole o access_token aqui:
+@token      = SEU_JWT_SUPABASE_AQUI
+
+# IDs de exemplo — atualize com valores reais após criar via API:
+@projectId  = proj-uuid-aqui
+@fileId     = file-uuid-aqui
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 1. HEALTH — Verificação de saúde (sem autenticação)
+# ══════════════════════════════════════════════════════════════════════════════
+
+### [1.1] Health check raiz
+# Esperado: 200 {"status": "ok", "version": "0.1.0"}
+GET {{baseUrl}}/health
+Accept: application/json
+
+###
+
+### [1.2] Health check API v1
+# Esperado: 200 {"status": "ok"}
+GET {{baseUrl}}/api/v1/health
+Accept: application/json
+
+###
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 2. AUTH — Autenticação via Supabase
+#    (use a UI do Supabase ou o SDK do frontend para obter o JWT)
+#    Endpoint de referência para integração direta com Supabase Auth REST API:
+# ══════════════════════════════════════════════════════════════════════════════
+
+### [2.1] Login com email/senha (Supabase Auth REST)
+# Substitua SUPABASE_URL e SUPABASE_ANON_KEY pelos valores do .env
+# Copie o access_token da resposta e cole em @token acima
+POST https://SEU_PROJETO.supabase.co/auth/v1/token?grant_type=password
+Content-Type: {{contentType}}
+apikey: SUA_SUPABASE_ANON_KEY
+
+{
+  "email": "usuario@exemplo.com",
+  "password": "sua-senha-aqui"
+}
+
+###
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 3. PROJETOS
+# ══════════════════════════════════════════════════════════════════════════════
+
+### [3.1] Criar projeto — dados válidos
+# Esperado: 201 Created com o objeto do projeto
+POST {{baseUrl}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Meu Projeto RAG",
+  "description": "Repositório de documentos internos da empresa"
+}
+
+###
+
+### [3.2] Criar projeto — sem descrição (opcional)
+# Esperado: 201 Created
+POST {{baseUrl}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Projeto Sem Descrição"
+}
+
+###
+
+### [3.3] Criar projeto — nome vazio (inválido)
+# Esperado: 422 Unprocessable Entity
+POST {{baseUrl}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "name": ""
+}
+
+###
+
+### [3.4] Criar projeto — nome muito longo (inválido, >120 chars)
+# Esperado: 422 Unprocessable Entity
+POST {{baseUrl}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "name": "NomeExcessivamenteLongoQueUltrapassaOLimiteDeCentoEVinteCaracteresDefinidoNoModeloPydanticDoBackendRAG"
+}
+
+###
+
+### [3.5] Criar projeto — sem autenticação
+# Esperado: 403 Forbidden
+POST {{baseUrl}}/api/projects
+Content-Type: {{contentType}}
+
+{
+  "name": "Projeto Sem Token"
+}
+
+###
+
+### [3.6] Listar projetos do usuário
+# Esperado: 200 OK com array de projetos
+GET {{baseUrl}}/api/projects
+Authorization: Bearer {{token}}
+
+###
+
+### [3.7] Listar projetos — sem autenticação
+# Esperado: 403 Forbidden
+GET {{baseUrl}}/api/projects
+
+###
+
+### [3.8] Deletar projeto
+# Esperado: 204 No Content
+DELETE {{baseUrl}}/api/projects/{{projectId}}
+Authorization: Bearer {{token}}
+
+###
+
+### [3.9] Deletar projeto inexistente
+# Esperado: 404 Not Found
+DELETE {{baseUrl}}/api/projects/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+
+###
+
+### [3.10] Deletar projeto — sem autenticação
+# Esperado: 403 Forbidden
+DELETE {{baseUrl}}/api/projects/{{projectId}}
+
+###
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 4. UPLOAD DE DOCUMENTOS
+# ══════════════════════════════════════════════════════════════════════════════
+
+### [4.1] Upload de PDF válido
+# Esperado: 202 Accepted com status="processing"
+# Nota: troque @pdf pelo caminho real do arquivo
+POST {{baseUrl}}/api/projects/{{projectId}}/upload
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=boundary123
+
+--boundary123
+Content-Disposition: form-data; name="file"; filename="relatorio.pdf"
+Content-Type: application/pdf
+
+< ./relatorio.pdf
+--boundary123--
+
+###
+
+### [4.2] Upload de arquivo .txt
+# Esperado: 202 Accepted
+POST {{baseUrl}}/api/projects/{{projectId}}/upload
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=boundary456
+
+--boundary456
+Content-Disposition: form-data; name="file"; filename="notas.txt"
+Content-Type: text/plain
+
+< ./notas.txt
+--boundary456--
+
+###
+
+### [4.3] Upload com extensão inválida (.jpg)
+# Esperado: 415 Unsupported Media Type
+POST {{baseUrl}}/api/projects/{{projectId}}/upload
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=boundary789
+
+--boundary789
+Content-Disposition: form-data; name="file"; filename="foto.jpg"
+Content-Type: image/jpeg
+
+< ./foto.jpg
+--boundary789--
+
+###
+
+### [4.4] Upload em projeto inexistente
+# Esperado: 404 Not Found
+POST {{baseUrl}}/api/projects/00000000-0000-0000-0000-000000000000/upload
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=boundaryXXX
+
+--boundaryXXX
+Content-Disposition: form-data; name="file"; filename="doc.pdf"
+Content-Type: application/pdf
+
+< ./relatorio.pdf
+--boundaryXXX--
+
+###
+
+### [4.5] Upload — sem autenticação
+# Esperado: 403 Forbidden
+POST {{baseUrl}}/api/projects/{{projectId}}/upload
+Content-Type: multipart/form-data; boundary=boundaryNOAUTH
+
+--boundaryNOAUTH
+Content-Disposition: form-data; name="file"; filename="doc.pdf"
+Content-Type: application/pdf
+
+< ./relatorio.pdf
+--boundaryNOAUTH--
+
+###
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 5. STATUS DO ARQUIVO
+# ══════════════════════════════════════════════════════════════════════════════
+
+### [5.1] Consultar status de processamento
+# Esperado: 200 OK com status = "processing" | "ready" | "error"
+GET {{baseUrl}}/api/projects/{{projectId}}/files/{{fileId}}/status
+Authorization: Bearer {{token}}
+
+###
+
+### [5.2] Status de arquivo inexistente
+# Esperado: 404 Not Found
+GET {{baseUrl}}/api/projects/{{projectId}}/files/00000000-0000-0000-0000-000000000000/status
+Authorization: Bearer {{token}}
+
+###
+
+### [5.3] Status — sem autenticação
+# Esperado: 403 Forbidden
+GET {{baseUrl}}/api/projects/{{projectId}}/files/{{fileId}}/status
+
+###
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 6. ARQUIVOS DO PROJETO
+# ══════════════════════════════════════════════════════════════════════════════
+
+### [6.1] Listar arquivos de um projeto
+# Esperado: 200 OK com array de documentos
+GET {{baseUrl}}/api/projects/{{projectId}}/files
+Authorization: Bearer {{token}}
+
+###
+
+### [6.2] Listar arquivos de projeto inexistente
+# Esperado: 404 Not Found
+GET {{baseUrl}}/api/projects/00000000-0000-0000-0000-000000000000/files
+Authorization: Bearer {{token}}
+
+###
+
+### [6.3] Listar arquivos — sem autenticação
+# Esperado: 403 Forbidden
+GET {{baseUrl}}/api/projects/{{projectId}}/files
+
+###
+
+### [6.4] Deletar arquivo
+# Esperado: 204 No Content
+DELETE {{baseUrl}}/api/projects/{{projectId}}/files/{{fileId}}
+Authorization: Bearer {{token}}
+
+###
+
+### [6.5] Deletar arquivo inexistente
+# Esperado: 404 Not Found
+DELETE {{baseUrl}}/api/projects/{{projectId}}/files/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+
+###
+
+### [6.6] Deletar arquivo — sem autenticação
+# Esperado: 403 Forbidden
+DELETE {{baseUrl}}/api/projects/{{projectId}}/files/{{fileId}}
+
+###
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 7. CHAT — Consulta RAG
+# ══════════════════════════════════════════════════════════════════════════════
+
+### [7.1] Chat — pergunta válida
+# Esperado: 200 OK com user_message, assistant_message e tokens
+POST {{baseUrl}}/api/projects/{{projectId}}/chat
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "message": "Qual é o tema principal dos documentos neste projeto?"
+}
+
+###
+
+### [7.2] Chat — segunda pergunta (multi-turno, histórico incluído automaticamente)
+# Esperado: 200 OK
+POST {{baseUrl}}/api/projects/{{projectId}}/chat
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "message": "Pode detalhar mais sobre o ponto anterior?"
+}
+
+###
+
+### [7.3] Chat — mensagem no limite máximo (4000 chars)
+# Esperado: 200 OK
+POST {{baseUrl}}/api/projects/{{projectId}}/chat
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "message": "Explique detalhadamente, com exemplos práticos e referências a páginas específicas dos documentos carregados, quais são as principais conclusões, recomendações, riscos identificados e oportunidades de melhoria descritos nos documentos deste projeto."
+}
+
+###
+
+### [7.4] Chat — mensagem vazia (inválida)
+# Esperado: 422 Unprocessable Entity
+POST {{baseUrl}}/api/projects/{{projectId}}/chat
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "message": ""
+}
+
+###
+
+### [7.5] Chat — mensagem muito longa (>4000 chars, inválida)
+# Esperado: 422 Unprocessable Entity
+POST {{baseUrl}}/api/projects/{{projectId}}/chat
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "message": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+}
+
+###
+
+### [7.6] Chat — payload sem campo 'message' (inválido)
+# Esperado: 422 Unprocessable Entity
+POST {{baseUrl}}/api/projects/{{projectId}}/chat
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{}
+
+###
+
+### [7.7] Chat — projeto inexistente
+# Esperado: 404 Not Found
+POST {{baseUrl}}/api/projects/00000000-0000-0000-0000-000000000000/chat
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "message": "Olá"
+}
+
+###
+
+### [7.8] Chat — sem autenticação
+# Esperado: 403 Forbidden
+POST {{baseUrl}}/api/projects/{{projectId}}/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "Qual é o conteúdo?"
+}
+
+###
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 8. HISTÓRICO DO CHAT
+# ══════════════════════════════════════════════════════════════════════════════
+
+### [8.1] Listar histórico completo (padrão: últimas 50 mensagens)
+# Esperado: 200 OK com array de mensagens em ordem cronológica
+GET {{baseUrl}}/api/projects/{{projectId}}/history
+Authorization: Bearer {{token}}
+
+###
+
+### [8.2] Listar histórico com limite customizado
+# Esperado: 200 OK com no máximo 10 mensagens
+GET {{baseUrl}}/api/projects/{{projectId}}/history?limit=10
+Authorization: Bearer {{token}}
+
+###
+
+### [8.3] Histórico de projeto inexistente
+# Esperado: 404 Not Found
+GET {{baseUrl}}/api/projects/00000000-0000-0000-0000-000000000000/history
+Authorization: Bearer {{token}}
+
+###
+
+### [8.4] Histórico — sem autenticação
+# Esperado: 403 Forbidden
+GET {{baseUrl}}/api/projects/{{projectId}}/history
+
+###
