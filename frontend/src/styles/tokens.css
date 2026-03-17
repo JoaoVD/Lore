@@ -1,0 +1,20 @@
+:root {
+  /* Marca */
+  --brand:         #0F6E56;
+  --brand-dark:    #085041;
+  --brand-light:   #E1F5EE;
+  --brand-mid:     #5DCAA5;
+
+  /* Neutros */
+  --ink:           #2C2C2A;
+  --ink-soft:      #3A3A38;
+  --muted:         #7A7870;
+  --stone:         #C8C6BC;
+  --parchment:     #F1EFE8;
+  --surface:       #FAFAF8;
+
+  /* Semânticas */
+  --color-error:   #A32D2D;
+  --color-warning: #BA7517;
+  --color-success: #0F6E56;
+}

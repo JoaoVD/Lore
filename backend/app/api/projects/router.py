@@ -26,6 +26,11 @@ from app.schemas.projects import (
     ProjectResponse,
 )
 from auth.middleware import AuthUser, get_current_user
+from app.services.limits_service import (
+    check_project_limit,
+    check_question_limit,
+    log_usage,
+)
 from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchValue
 from rag.query import query_documents
@@ -78,6 +83,8 @@ async def create_project(
     supabase: Client = Depends(get_supabase),
 ):
     """Cria um novo projeto para o usuário autenticado."""
+    check_project_limit(user.id)
+
     result = (
         supabase.table("projects")
         .insert({
@@ -89,6 +96,8 @@ async def create_project(
     )
     if not result.data:
         raise HTTPException(status_code=500, detail="Falha ao criar projeto")
+
+    log_usage(user.id, "project_create")
     return result.data[0]
 
 
@@ -246,6 +255,8 @@ async def chat(
     proj_result = supabase.table("projects").select("id, user_id").eq("id", project_id).single().execute()
     _assert_project_owner(proj_result.data, user.id)
 
+    check_question_limit(user.id)
+
     # Busca as últimas 10 mensagens para contexto de conversa
     history_result = (
         supabase.table("chat_messages")
@@ -282,6 +293,8 @@ async def chat(
         raise HTTPException(status_code=500, detail="Falha ao salvar mensagens")
 
     user_msg, assistant_msg = insert_result.data[0], insert_result.data[1]
+
+    log_usage(user.id, "question", project_id)
 
     return ChatResponse(
         user_message=ChatMessageResponse(**user_msg),

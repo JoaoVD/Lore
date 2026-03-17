@@ -29,6 +29,7 @@ from supabase import Client
 from app.core.config import settings
 from app.db.supabase import get_supabase
 from app.schemas.projects import DocumentResponse
+from app.services.limits_service import check_document_limit, log_usage
 from auth.middleware import AuthUser, get_current_user
 from rag.ingest import ingest_document
 
@@ -175,6 +176,9 @@ async def upload_document(
     proj = supabase.table("projects").select("id, user_id").eq("id", project_id).single().execute()
     _assert_project_owner(proj.data, user.id)
 
+    # ── 1b. Verifica limite de documentos do plano ───────────────────────────
+    check_document_limit(user.id, project_id)
+
     # ── 2. Valida extensão ───────────────────────────────────────────────────
     filename = file.filename or "upload"
     ext = Path(filename).suffix.lower()
@@ -237,6 +241,7 @@ async def upload_document(
         storage_path=storage_path,
     )
 
+    log_usage(user.id, "document_upload", project_id)
     logger.info("Upload recebido | doc=%s file=%s size=%dKB", document_id, filename, len(content) // 1024)
 
     return UploadResponse(
