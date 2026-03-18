@@ -3,16 +3,15 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-01-27.acacia',
-})
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
-
 export async function POST(req: Request) {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2026-02-25.clover',
+  })
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
   const body = await req.text()
   const headersList = await headers()
   const sig = headersList.get('stripe-signature')
@@ -36,8 +35,14 @@ export async function POST(req: Request) {
   const data = event.data.object
 
   function planFromPriceId(priceId: string): string {
-    if (priceId === process.env.STRIPE_PRICE_ID_BUSINESS) return 'business'
-    if (priceId === process.env.STRIPE_PRICE_ID_PRO) return 'pro'
+    if ([
+      process.env.STRIPE_PRICE_ID_BUSINESS_MONTHLY,
+      process.env.STRIPE_PRICE_ID_BUSINESS_ANNUAL,
+    ].includes(priceId)) return 'business'
+    if ([
+      process.env.STRIPE_PRICE_ID_PRO_MONTHLY,
+      process.env.STRIPE_PRICE_ID_PRO_ANNUAL,
+    ].includes(priceId)) return 'pro'
     return 'free'
   }
 
