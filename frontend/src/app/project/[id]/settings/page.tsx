@@ -14,7 +14,7 @@ import type { Project } from '@/types'
 // ── API ───────────────────────────────────────────────────────────────────────
 
 const PROJECTS_BASE =
-  (process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') ?? 'http://localhost:8000') +
+  (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000') +
   '/api/projects'
 
 async function apiFetch<T>(path: string, token: string, init?: RequestInit): Promise<T> {

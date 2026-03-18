@@ -14,9 +14,15 @@ from app.db.supabase import get_supabase
 
 def _plan_from_price_id(price_id: str) -> str:
     """Determina o plano ('pro' ou 'business') a partir do price_id do Stripe."""
-    if price_id and price_id == settings.STRIPE_PRICE_ID_BUSINESS:
+    if price_id and price_id in (
+        settings.STRIPE_PRICE_ID_BUSINESS_MONTHLY,
+        settings.STRIPE_PRICE_ID_BUSINESS_ANNUAL,
+    ):
         return "business"
-    if price_id and price_id in (settings.STRIPE_PRICE_ID_PRO, settings.STRIPE_PRICE_ID_ENTERPRISE):
+    if price_id and price_id in (
+        settings.STRIPE_PRICE_ID_PRO_MONTHLY,
+        settings.STRIPE_PRICE_ID_PRO_ANNUAL,
+    ):
         return "pro"
     return "pro"  # padrão para qualquer assinatura ativa não mapeada
 
