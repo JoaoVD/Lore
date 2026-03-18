@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.upload import router as upload_router
+from app.api.upload import router as upload_router
 from app.api.projects.router import router as projects_router
 from app.api.v1.router import api_router
 from app.core.config import settings
