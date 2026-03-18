@@ -35,7 +35,7 @@ interface ChatMessage {
 // ── API ───────────────────────────────────────────────────────────────────────
 
 const PROJECTS_BASE =
-  (process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') ?? 'http://localhost:8000') +
+  (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000') +
   '/api/projects'
 
 async function apiFetch<T>(
@@ -180,25 +180,25 @@ function WidgetInner() {
 
   // Project ID comes from the URL path [id] OR from ?project_id= query param
   const projectId = (params.id as string) || searchParams.get('project_id') || ''
-  const apiKey    = searchParams.get('api_key') || ''
-  const title     = searchParams.get('title') || 'Assistente Lumi'
+  const apiKey = searchParams.get('api_key') || ''
+  const title = searchParams.get('title') || 'Assistente Lumi'
   const placeholder = searchParams.get('placeholder') || 'Faça uma pergunta…'
   const themeColor = searchParams.get('color') || '#0F6E56'
 
-  const [messages, setMessages]       = useState<ChatMessage[]>([])
-  const [input, setInput]             = useState('')
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
-  const [initError, setInitError]     = useState('')
-  const [ready, setReady]             = useState(false)
+  const [initError, setInitError] = useState('')
+  const [ready, setReady] = useState(false)
 
-  const bottomRef   = useRef<HTMLDivElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // ── Init ────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!projectId) { setInitError('Parâmetro project_id ausente na URL.'); return }
-    if (!apiKey)    { setInitError('Parâmetro api_key ausente na URL.'); return }
+    if (!apiKey) { setInitError('Parâmetro api_key ausente na URL.'); return }
 
     async function loadHistory() {
       try {

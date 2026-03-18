@@ -42,7 +42,7 @@ interface ChatMessage {
 
 // Projects router is mounted at /api/projects (NOT /api/v1)
 const PROJECTS_BASE =
-  (process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') ?? 'http://localhost:8000') +
+  (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000') +
   '/api/projects'
 
 async function apiFetch<T>(
@@ -456,7 +456,9 @@ function ChatEmptyState({ hasDocuments }: { hasDocuments: boolean }) {
 export default function ProjectPage() {
   const params = useParams()
   const router = useRouter()
-  const projectId = params.id as string
+  const rawSlug = params.id as string
+  // UUID tem sempre 36 chars; formato do slug é "nome--uuid" ou só "uuid" (legado)
+  const projectId = rawSlug.length > 36 ? rawSlug.slice(-36) : rawSlug
   const supabase = createClient()
   const { toasts, toast, close } = useToast()
 
@@ -762,7 +764,7 @@ export default function ProjectPage() {
                 title="Configurações do projeto"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
               </Link>
             </div>
@@ -774,11 +776,10 @@ export default function ProjectPage() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
-                  activeTab === tab
-                    ? 'text-brand border-b-2 border-brand'
-                    : 'text-muted hover:text-ink-soft'
-                }`}
+                className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${activeTab === tab
+                  ? 'text-brand border-b-2 border-brand'
+                  : 'text-muted hover:text-ink-soft'
+                  }`}
               >
                 {tab === 'docs' ? `Documentos (${documents.length})` : 'Chat'}
               </button>
@@ -913,8 +914,8 @@ export default function ProjectPage() {
                       !hasDocuments
                         ? 'Envie um documento para começar...'
                         : readyDocs.length === 0
-                        ? 'Aguardando processamento...'
-                        : 'Faça uma pergunta sobre seus documentos...'
+                          ? 'Aguardando processamento...'
+                          : 'Faça uma pergunta sobre seus documentos...'
                     }
                     disabled={!hasDocuments || readyDocs.length === 0 || chatLoading}
                     rows={1}

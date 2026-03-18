@@ -30,9 +30,10 @@ class Settings(BaseSettings):
     # Stripe (opcional — não bloqueia startup se vazio)
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
-    STRIPE_PRICE_ID_PRO: str = ""
-    STRIPE_PRICE_ID_BUSINESS: str = ""
-    STRIPE_PRICE_ID_ENTERPRISE: str = ""  # legado
+    STRIPE_PRICE_ID_PRO_MONTHLY: str = ""
+    STRIPE_PRICE_ID_PRO_ANNUAL: str = ""
+    STRIPE_PRICE_ID_BUSINESS_MONTHLY: str = ""
+    STRIPE_PRICE_ID_BUSINESS_ANNUAL: str = ""
 
     # Auth JWT interno (para rotas não-Supabase)
     SECRET_KEY: str = "dev-secret-change-in-production"
