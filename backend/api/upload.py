@@ -92,6 +92,7 @@ def _run_ingest(
     tenant_id: str,
     project_id: str,
     storage_path: str,
+    original_filename: str,
 ) -> None:
     """
     Executada na thread pool do FastAPI após a resposta ser enviada ao cliente.
@@ -111,6 +112,7 @@ def _run_ingest(
             file_path=Path(tmp_path),
             tenant_id=tenant_id,
             project_id=project_id,
+            original_filename=original_filename,
         )
 
         if result.status == "success":
@@ -239,6 +241,7 @@ async def upload_document(
         tenant_id=user.id,
         project_id=project_id,
         storage_path=storage_path,
+        original_filename=original_filename,
     )
 
     log_usage(user.id, "document_upload", project_id)
