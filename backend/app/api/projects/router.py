@@ -131,8 +131,14 @@ async def delete_project(
     - Registros no banco (chat_messages → documents → projects, por FK cascade)
     """
     # Verifica ownership
-    proj_result = supabase.table("projects").select("*").eq("id", project_id).single().execute()
-    _assert_project_owner(proj_result.data, user.id)
+proj_result = supabase.table("projects") \
+    .select("id") \
+    .eq("id", project_id) \
+    .eq("user_id", user_id) \
+    .execute()
+
+if not proj_result.data:
+    raise HTTPException(status_code=404, detail="Projeto não encontrado")
 
     # 1. Remove arquivos do Supabase Storage
     docs_result = (
@@ -164,6 +170,7 @@ async def delete_project(
     # 3. Deleta registros do banco (cascade apaga documents e chat_messages)
     supabase.table("projects").delete().eq("id", project_id).execute()
 
+    return {"message": "Projeto deletado com sucesso", "project_id": project_id}
 
 # ── Documents ─────────────────────────────────────────────────────────────────
 # Upload e status de processamento → api/upload.py (assíncrono com BackgroundTasks)
