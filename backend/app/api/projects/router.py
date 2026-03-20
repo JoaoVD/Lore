@@ -131,13 +131,13 @@ async def delete_project(
     - Registros no banco (chat_messages → documents → projects, por FK cascade)
     """
     # Verifica ownership
-proj_result = supabase.table("projects") \
+    proj_result = supabase.table("projects") \
     .select("id") \
     .eq("id", project_id) \
     .eq("user_id", user_id) \
     .execute()
 
-if not proj_result.data:
+    if not proj_result.data:
     raise HTTPException(status_code=404, detail="Projeto não encontrado")
 
     # 1. Remove arquivos do Supabase Storage
