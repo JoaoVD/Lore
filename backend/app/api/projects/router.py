@@ -123,22 +123,15 @@ async def delete_project(
     user: AuthUser = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    """
-    Deleta o projeto e todos os seus dados:
-    - Arquivos no Supabase Storage
-    - Vetores no Qdrant (collection inteira do tenant se for o último projeto,
-      ou filtrando por project_id)
-    - Registros no banco (chat_messages → documents → projects, por FK cascade)
-    """
     # Verifica ownership
     proj_result = supabase.table("projects") \
-    .select("id") \
-    .eq("id", project_id) \
-    .eq("user_id", user_id) \
-    .execute()
+        .select("id") \
+        .eq("id", project_id) \
+        .eq("user_id", user.id) \
+        .execute()
 
     if not proj_result.data:
-    raise HTTPException(status_code=404, detail="Projeto não encontrado")
+        raise HTTPException(status_code=404, detail="Projeto não encontrado")
 
     # 1. Remove arquivos do Supabase Storage
     docs_result = (
@@ -157,7 +150,7 @@ async def delete_project(
         except Exception:
             pass  # Não bloqueia a deleção se storage falhar
 
-    # 2. Remove vetores do Qdrant filtrados por project_id
+    # 2. Remove vetores do Qdrant
     collection = f"tenant_{user.id}"
     _delete_qdrant_points(
         tenant_id=user.id,
@@ -167,7 +160,7 @@ async def delete_project(
         ),
     )
 
-    # 3. Deleta registros do banco (cascade apaga documents e chat_messages)
+    # 3. Deleta registros do banco
     supabase.table("projects").delete().eq("id", project_id).execute()
 
     return {"message": "Projeto deletado com sucesso", "project_id": project_id}
