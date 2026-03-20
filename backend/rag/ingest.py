@@ -128,6 +128,7 @@ def ingest_document(
     file_path: str | Path,
     tenant_id: str,
     project_id: str,
+    original_filename: str | None = None, 
 ) -> IngestResult:
     """
     Ingest a single document into the tenant's Qdrant collection.
@@ -141,11 +142,12 @@ def ingest_document(
         IngestResult with status, chunk count, collection name, and message.
     """
     file_path = Path(file_path)
+    display_name = original_filename or file_path.name
     collection = _collection_name(tenant_id)
 
     logger.info(
         "Starting ingestion | file=%s tenant=%s project=%s",
-        file_path.name, tenant_id, project_id,
+        display_name, tenant_id, project_id,
     )
 
     # ── 1. Validate file ─────────────────────────────────────────────────────
@@ -194,7 +196,7 @@ def ingest_document(
         page = node.metadata.get("page_label") or node.metadata.get("page_number", 1)
         node.metadata.update({
             "project_id": project_id,
-            "file_name": file_path.name,
+            "file_name": display_name,
             "page_number": page,
             "tenant_id": tenant_id,
         })
