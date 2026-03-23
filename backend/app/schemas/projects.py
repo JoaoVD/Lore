@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -51,3 +51,21 @@ class ChatResponse(BaseModel):
     user_message: ChatMessageResponse
     assistant_message: ChatMessageResponse
     tokens: dict[str, int]           # {prompt, completion, total}
+
+
+# ── Members ───────────────────────────────────────────────────────────────────
+
+class MemberInvite(BaseModel):
+    email: str
+    role: Literal["viewer", "editor"]   # "owner" só é atribuído na criação do projeto
+
+
+class MemberUpdate(BaseModel):
+    role: Literal["viewer", "editor"]   # owner não pode ser rebaixado via PATCH
+
+
+class MemberResponse(BaseModel):
+    user_id: str
+    email: str
+    role: str                           # "owner" | "editor" | "viewer"
+    created_at: datetime
