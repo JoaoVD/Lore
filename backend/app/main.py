@@ -2,6 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.upload import router as upload_router
+from app.api.integrations.google_drive import (
+    integrations_router,
+    project_integrations_router,
+)
 from app.api.projects.router import router as projects_router
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -30,6 +34,12 @@ app.include_router(projects_router, prefix="/api/projects", tags=["projects"])
 
 # Upload assíncrono + status de processamento (BackgroundTasks)
 app.include_router(upload_router, prefix="/api/projects", tags=["upload"])
+
+# Google Drive — rotas de autenticação e pastas
+app.include_router(integrations_router, prefix="/api/integrations", tags=["integrations"])
+
+# Google Drive — rotas específicas de projeto (vinculação + sync)
+app.include_router(project_integrations_router, prefix="/api/projects", tags=["integrations"])
 
 
 @app.get("/health", tags=["infra"])

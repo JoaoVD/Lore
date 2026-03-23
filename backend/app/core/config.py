@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     # Supabase Storage
     SUPABASE_STORAGE_BUCKET: str = "documents"
 
+    # Google OAuth — Google Drive integration
+    # Obtenha em: console.cloud.google.com → APIs & Services → Credentials
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    # URI de redirecionamento cadastrado no Google Cloud Console
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/integrations/google-drive/callback"
+
     class Config:
         env_file = ".env"
         case_sensitive = True
