@@ -26,11 +26,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Up
 from pydantic import BaseModel
 from supabase import Client
 
+from app.api.projects.permissions import ProjectAccess, require_project_access
 from app.core.config import settings
 from app.db.supabase import get_supabase
 from app.schemas.projects import DocumentResponse
 from app.services.limits_service import check_document_limit, log_usage
-from auth.middleware import AuthUser, get_current_user
 from rag.ingest import ingest_document
 
 logger = logging.getLogger(__name__)
@@ -65,14 +65,6 @@ class StatusResponse(BaseModel):
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _assert_project_owner(project: dict | None, user_id: str) -> dict:
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Projeto não encontrado")
-    if project["user_id"] != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado")
-    return project
-
 
 def _upload_to_storage(supabase: Client, path: str, content: bytes, content_type: str) -> str:
     """Faz upload para o Supabase Storage e retorna a URL pública."""
@@ -170,16 +162,13 @@ async def upload_document(
     project_id: str,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    user: AuthUser = Depends(get_current_user),
+    access: ProjectAccess = Depends(require_project_access("editor")),
     supabase: Client = Depends(get_supabase),
 ) -> UploadResponse:
 
-    # ── 1. Verifica ownership ────────────────────────────────────────────────
-    proj = supabase.table("projects").select("id, user_id").eq("id", project_id).single().execute()
-    _assert_project_owner(proj.data, user.id)
-
-    # ── 1b. Verifica limite de documentos do plano ───────────────────────────
-    check_document_limit(user.id, project_id)
+    # ── 1. Verifica limite de documentos do plano ────────────────────────────
+    # require_project_access("editor") já validou acesso; owner_id é o dono do projeto
+    check_document_limit(access.owner_id, project_id)
 
     # ── 2. Valida extensão ───────────────────────────────────────────────────
     filename = file.filename or "upload"
@@ -203,8 +192,9 @@ async def upload_document(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Arquivo vazio")
 
     # ── 4. Upload para Supabase Storage ──────────────────────────────────────
-    # Inclui user_id no path para isolar dados entre tenants no Storage
-    storage_path = f"{user.id}/{project_id}/{filename}"
+    # Usa owner_id (não o uploader) para manter todos os arquivos do projeto
+    # sob o mesmo prefixo no Storage, independente de quem fez o upload.
+    storage_path = f"{access.owner_id}/{project_id}/{filename}"
     try:
         file_url = _upload_to_storage(supabase, storage_path, content, content_type)
     except Exception as exc:
@@ -238,13 +228,13 @@ async def upload_document(
         _run_ingest,
         document_id=document_id,
         tmp_path=tmp_path,
-        tenant_id=user.id,
+        tenant_id=access.owner_id,   # sempre o dono do projeto → collection correta no Qdrant
         project_id=project_id,
         storage_path=storage_path,
-        original_filename=original_filename,
+        original_filename=filename,
     )
 
-    log_usage(user.id, "document_upload", project_id)
+    log_usage(access.owner_id, "document_upload", project_id)
     logger.info("Upload recebido | doc=%s file=%s size=%dKB", document_id, filename, len(content) // 1024)
 
     return UploadResponse(
@@ -264,13 +254,9 @@ async def upload_document(
 async def get_file_status(
     project_id: str,
     file_id: str,
-    user: AuthUser = Depends(get_current_user),
+    access: ProjectAccess = Depends(require_project_access("viewer")),
     supabase: Client = Depends(get_supabase),
 ) -> StatusResponse:
-
-    # Verifica ownership
-    proj = supabase.table("projects").select("id, user_id").eq("id", project_id).single().execute()
-    _assert_project_owner(proj.data, user.id)
 
     # Busca o documento
     doc_result = (
