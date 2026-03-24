@@ -404,9 +404,15 @@ def _sync_drive_folder_bg(
 
 
 @integrations_router.get(
-    "/google-drive/auth",
+    "/google/authorize",
     response_model=AuthUrlResponse,
     summary="Inicia o fluxo OAuth do Google Drive",
+)
+@integrations_router.get(
+    "/google-drive/auth",
+    response_model=AuthUrlResponse,
+    summary="Inicia o fluxo OAuth do Google Drive (alias)",
+    include_in_schema=False,
 )
 async def google_drive_auth(
     user: AuthUser = Depends(get_current_user),
