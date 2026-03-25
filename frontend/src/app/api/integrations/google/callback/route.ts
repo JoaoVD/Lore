@@ -11,7 +11,7 @@
  *
  * Fluxo completo:
  *   Google → localhost:3000/api/integrations/google/callback?code=…&state=…
- *         → (302) localhost:8000/api/integrations/google/callback?code=…&state=…
+ *         → (302) localhost:8000/api/integrations/google-drive/callback?code=…&state=…
  *         → FastAPI salva tokens no banco
  *         → (302) localhost:3000/project/{id}/settings?gdrive_connected=1
  */
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
   // Encaminha os parâmetros ao FastAPI com um redirect simples
   // (mantém os mesmos query params que o Google enviou)
-  const backendCallback = new URL(`${BACKEND_URL}/api/integrations/google/callback`)
+  const backendCallback = new URL(`${BACKEND_URL}/api/integrations/google-drive/callback`)
   backendCallback.searchParams.set('code', code)
   backendCallback.searchParams.set('state', state)
 
