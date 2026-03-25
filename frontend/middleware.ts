@@ -10,6 +10,9 @@ const PUBLIC_PATHS = [
   '/api',
   '/_next',
   '/favicon.ico',
+  '/terms',
+  '/privacy',
+  '/contact',
 ]
 
 function isPublic(pathname: string): boolean {

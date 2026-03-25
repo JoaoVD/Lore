@@ -9,6 +9,7 @@ import Input from '@/components/ui/Input'
 import Card from '@/components/ui/Card'
 import { ToastContainer, useToast } from '@/components/ui/Toast'
 import LoreLogo from '@/components/LoreLogo'
+import ReviewModal, { reviewStorageKey } from '@/components/ui/ReviewModal'
 import type { Project } from '@/types'
 
 // ── API helper ───────────────────────────────────────────────────────────────
@@ -34,7 +35,8 @@ async function apiFetch<T>(path: string, token: string, init?: RequestInit): Pro
       typeof detail === 'object' && detail?.message ? detail.message : (detail ?? `Erro ${res.status}`)
     )
   }
-  return res.json()
+  const text = await res.text()
+  return (text ? JSON.parse(text) : undefined) as T
 }
 
 function slugify(name: string): string {
@@ -445,6 +447,9 @@ export default function DashboardPage() {
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
+  const [showReviewModal, setShowReviewModal] = useState(false)
+  const [reviewUserId, setReviewUserId] = useState('')
+
   // ── Load session + projects ──────────────────────────────────────────────
 
   const loadProjects = useCallback(async (accessToken: string) => {
@@ -481,6 +486,16 @@ export default function DashboardPage() {
         session.user.email?.split('@')[0] ||
         'Usuário'
       )
+
+      // Mostrar modal de avaliação após 14 dias de uso
+      const uid = session.user.id
+      const createdAt = new Date(session.user.created_at)
+      const daysSince = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24)
+      const alreadyAnswered = localStorage.getItem(reviewStorageKey(uid))
+      if (daysSince >= 14 && !alreadyAnswered) {
+        setReviewUserId(uid)
+        setTimeout(() => setShowReviewModal(true), 1500)
+      }
 
       try {
         const data = await loadProjects(session.access_token)
@@ -636,6 +651,10 @@ export default function DashboardPage() {
           onConfirm={handleDeleteConfirm}
           onClose={() => setDeleteTarget(null)}
         />
+      )}
+
+      {showReviewModal && reviewUserId && (
+        <ReviewModal userId={reviewUserId} onClose={() => setShowReviewModal(false)} />
       )}
 
       <ToastContainer toasts={toasts} onClose={close} />
