@@ -502,7 +502,7 @@ function IntegrationsSection({
   const loadIntegration = useCallback(async () => {
     try {
       const data = await apiFetch<GoogleDriveIntegration | null>(
-        `/${projectId}/integrations/google`, token
+        `/${projectId}/integrations/google-drive`, token
       )
       setIntegration(data)
       if (data?.folder_id) {
@@ -528,7 +528,10 @@ function IntegrationsSection({
   useEffect(() => {
     if (!integration?.id || folders.length > 0) return
     setLoadingFolders(true)
-    apiFetch<DriveFolder[]>(`/${projectId}/integrations/google/folders`, token)
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+    fetch(`${apiBase}/api/integrations/google-drive/folders`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(r => r.json())
       .then(setFolders)
       .catch(() => {})
       .finally(() => setLoadingFolders(false))
@@ -547,8 +550,8 @@ function IntegrationsSection({
         throw new Error(body.detail ?? 'Erro ao obter URL de autorização')
       }
       const data = await res.json()
-      if (!data.oauth_url) throw new Error('URL de autorização inválida')
-      window.location.href = data.oauth_url
+      if (!data.auth_url) throw new Error('URL de autorização inválida')
+      window.location.href = data.auth_url
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Erro ao iniciar conexão.', 'error')
       setConnecting(false)
@@ -560,8 +563,8 @@ function IntegrationsSection({
     setSavingFolder(true)
     try {
       const updated = await apiFetch<GoogleDriveIntegration>(
-        `/${projectId}/integrations/google`, token, {
-          method: 'PATCH',
+        `/${projectId}/integrations/google-drive`, token, {
+          method: 'POST',
           body: JSON.stringify({ folder_id: selectedFolder.id, folder_name: selectedFolder.name }),
         }
       )
@@ -577,7 +580,7 @@ function IntegrationsSection({
   async function handleSync() {
     setSyncing(true)
     try {
-      await apiFetch(`/${projectId}/integrations/google/sync`, token, { method: 'POST' })
+      await apiFetch(`/${projectId}/integrations/google-drive/sync`, token, { method: 'POST' })
       toast('Sincronização iniciada! Os documentos aparecerão em breve.', 'info')
       // Poll para atualizar o timestamp
       setTimeout(async () => {
@@ -593,7 +596,7 @@ function IntegrationsSection({
   async function handleRemove() {
     setRemoving(true)
     try {
-      await apiFetch(`/${projectId}/integrations/google`, token, { method: 'DELETE' })
+      await apiFetch(`/${projectId}/integrations/google-drive`, token, { method: 'DELETE' })
       setIntegration(null)
       setFolders([])
       setSelectedFolder(null)

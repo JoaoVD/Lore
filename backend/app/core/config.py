@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     # URI de redirecionamento cadastrado no Google Cloud Console
-    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/integrations/google-drive/callback"
+    GOOGLE_REDIRECT_URI: str = "http://localhost:3000/api/integrations/google/callback"
 
     class Config:
         env_file = ".env"
