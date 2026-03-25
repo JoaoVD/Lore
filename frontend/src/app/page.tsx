@@ -155,11 +155,6 @@ const PLANS: Plan[] = [
   },
 ]
 
-const TESTIMONIALS = [
-  { initials: 'MF', name: 'Maria F.', role: 'Clínica odontológica, SP', quote: '"Minha recepcionista parou de me ligar a cada 10 minutos. Agora ela consulta o Lore e resolve sozinha. Economizei pelo menos 2 horas por dia."' },
-  { initials: 'CR', name: 'Carlos R.', role: 'Distribuidora de alimentos, MG', quote: '"Meus vendedores consultam no celular enquanto estão com o cliente. Paramos de perder venda por falta de informação na hora certa."' },
-  { initials: 'RT', name: 'Rafael T.', role: 'Escritório de contabilidade, RJ', quote: '"Coloquei o widget no meu site e os clientes tiram dúvidas sozinhos, até de madrugada. Reduzi 60% das perguntas por WhatsApp."' },
-]
 
 // ── MAIN COMPONENT ─────────────────────────────────────────────────
 export default function LandingPage() {
@@ -437,34 +432,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── TESTIMONIALS ── */}
-      <section style={{ padding: '80px 40px', maxWidth: 960, margin: '0 auto' }}>
-        <Reveal>
-          <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#0F6E56', marginBottom: 12 }}>Quem já usa</p>
-          <h2 style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: 'clamp(28px, 4vw, 42px)', fontWeight: 400, lineHeight: 1.2, marginBottom: 12 }}>
-            O que nossos clientes dizem
-          </h2>
-          <p style={{ fontSize: 16, color: '#7A7870', maxWidth: 480, lineHeight: 1.65, marginBottom: 48, fontWeight: 300 }}>
-            PMEs de diferentes segmentos que pararam de perder tempo buscando informação.
-          </p>
-        </Reveal>
-        <div className="three-cols" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
-          {TESTIMONIALS.map((t, i) => (
-            <Reveal key={i} delay={i * 80}>
-              <div className="testi-card">
-                <p style={{ fontSize: 14, color: '#3A3A38', lineHeight: 1.7, marginBottom: 16, fontStyle: 'italic' }}>{t.quote}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 8, background: '#E1F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 500, color: '#085041' }}>{t.initials}</div>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 500, color: '#1C1C1A' }}>{t.name}</p>
-                    <p style={{ fontSize: 11, color: '#7A7870' }}>{t.role}</p>
-                  </div>
-                </div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
 
       {/* ── PRICING ── */}
       <section id="pricing" style={{ padding: '80px 40px', maxWidth: 1000, margin: '0 auto' }}>
@@ -536,7 +503,6 @@ export default function LandingPage() {
             Criar conta grátis
             <svg width="16" height="16" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </a>
-          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 14, position: 'relative' }}>Mais de 200 empresas já usam o Lore</p>
         </Reveal>
       </section>
 
@@ -548,10 +514,16 @@ export default function LandingPage() {
             <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>Your company, remembered.</p>
           </div>
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-            {['Produto', 'Preços', 'Termos de uso', 'Privacidade', 'Contato'].map((l) => (
-              <a key={l} href="#" style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', textDecoration: 'none', transition: 'color .2s' }}
+            {[
+              { label: 'Produto', href: '#demo' },
+              { label: 'Preços', href: '#pricing' },
+              { label: 'Termos de uso', href: '/terms' },
+              { label: 'Privacidade', href: '/privacy' },
+              { label: 'Contato', href: '/contact' },
+            ].map((l) => (
+              <a key={l.label} href={l.href} style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', textDecoration: 'none', transition: 'color .2s' }}
                 onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.35)')}>{l}</a>
+                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.35)')}>{l.label}</a>
             ))}
           </div>
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>© 2026 Lore. Todos os direitos reservados.</p>

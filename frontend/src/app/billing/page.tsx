@@ -152,7 +152,7 @@ function PlanCard({ plan, cycle }: { plan: Plan; cycle: BillingCycle }) {
     >
       {/* Top badges row */}
       <div className="flex items-start justify-between p-7 pb-0">
-        {/* Trial badge */}
+        {/* Cancellation badge */}
         <span
           className={`
             inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full
@@ -161,13 +161,14 @@ function PlanCard({ plan, cycle }: { plan: Plan; cycle: BillingCycle }) {
         >
           <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" aria-hidden>
             <path
-              d="M6 1v1m0 8v1M1 6h1m8 0h1M2.636 2.636l.707.707m5.314 5.314.707.707M2.636 9.364l.707-.707m5.314-5.314.707-.707"
+              d="M2 6l3 3 5-5"
               stroke="currentColor"
-              strokeWidth="1.2"
+              strokeWidth="1.4"
               strokeLinecap="round"
+              strokeLinejoin="round"
             />
           </svg>
-          14 dias grátis
+          Cancele quando quiser
         </span>
 
         {/* Popular / save badge */}
@@ -273,7 +274,7 @@ function PlanCard({ plan, cycle }: { plan: Plan; cycle: BillingCycle }) {
               Aguarde...
             </>
           ) : (
-            'Iniciar teste grátis'
+            'Assinar agora'
           )}
         </button>
       </div>
@@ -315,7 +316,7 @@ export default function BillingPage() {
           </h1>
 
           <p className="text-base text-[#7A7870] max-w-md mx-auto leading-relaxed">
-            Comece com 14 dias grátis — sem cartão de crédito.
+            Faça o upgrade e desbloqueie todos os recursos.
             Cancele quando quiser.
           </p>
         </div>
@@ -368,7 +369,7 @@ export default function BillingPage() {
         <p className="text-center text-xs text-[#7A7870] mt-10 leading-relaxed">
           Pagamentos processados com segurança pelo Stripe.
           <br />
-          Cancele a qualquer momento — sem taxas ou penalidades.
+          Sem fidelidade — cancele a qualquer momento sem taxas ou penalidades.
         </p>
       </div>
     </main>

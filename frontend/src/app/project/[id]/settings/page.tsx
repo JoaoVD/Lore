@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
@@ -9,7 +9,7 @@ import Input from '@/components/ui/Input'
 import Card from '@/components/ui/Card'
 import { ToastContainer, useToast } from '@/components/ui/Toast'
 import LoreLogo from '@/components/LoreLogo'
-import type { Project } from '@/types'
+import type { Project, ProjectMember, MemberRole, GoogleDriveIntegration, DriveFolder } from '@/types'
 
 // ── API ───────────────────────────────────────────────────────────────────────
 
@@ -32,7 +32,8 @@ async function apiFetch<T>(path: string, token: string, init?: RequestInit): Pro
     throw new Error(body.detail ?? `Erro ${res.status}`)
   }
   if (res.status === 204) return undefined as T
-  return res.json()
+  const text = await res.text()
+  return (text ? JSON.parse(text) : undefined) as T
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -55,6 +56,10 @@ function storeKey(projectId: string, key: string) {
 function getEmbedOrigin(): string {
   if (typeof window === 'undefined') return 'https://app.lumiAI.com'
   return window.location.origin
+}
+
+function getInitials(email: string): string {
+  return email.slice(0, 2).toUpperCase()
 }
 
 // ── Copy Button ───────────────────────────────────────────────────────────────
@@ -122,6 +127,28 @@ function Section({
 
 function Divider() {
   return <div className="h-px bg-stone/30" />
+}
+
+// ── Role Badge ────────────────────────────────────────────────────────────────
+
+const ROLE_LABELS: Record<MemberRole, string> = {
+  owner: 'Owner',
+  editor: 'Editor',
+  viewer: 'Viewer',
+}
+
+const ROLE_CLASSES: Record<MemberRole, string> = {
+  owner: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  editor: 'bg-blue-100 text-blue-700 border border-blue-200',
+  viewer: 'bg-stone/20 text-muted border border-stone/40',
+}
+
+function RoleBadge({ role }: { role: MemberRole }) {
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${ROLE_CLASSES[role]}`}>
+      {ROLE_LABELS[role]}
+    </span>
+  )
 }
 
 // ── Delete Confirm Modal ──────────────────────────────────────────────────────
@@ -227,16 +254,521 @@ function RegenerateModal({
   )
 }
 
-// ── Settings Page ─────────────────────────────────────────────────────────────
+// ── Members Section ───────────────────────────────────────────────────────────
 
-export default function SettingsPage() {
+function MembersSection({
+  projectId,
+  token,
+  isOwner,
+  toast,
+}: {
+  projectId: string
+  token: string
+  isOwner: boolean
+  toast: (msg: string, type: 'success' | 'error' | 'info' | 'warning') => void
+}) {
+  const [members, setMembers] = useState<ProjectMember[]>([])
+  const [loadingMembers, setLoadingMembers] = useState(true)
+
+  // Invite form state
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'editor' | 'viewer'>('viewer')
+  const [inviting, setInviting] = useState(false)
+
+  // Per-member role update state
+  const [updatingRole, setUpdatingRole] = useState<string | null>(null)
+  const [removingMember, setRemovingMember] = useState<string | null>(null)
+
+  const loadMembers = useCallback(async () => {
+    try {
+      const data = await apiFetch<ProjectMember[]>(`/${projectId}/members`, token)
+      setMembers(data ?? [])
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao carregar membros.', 'error')
+    } finally {
+      setLoadingMembers(false)
+    }
+  }, [projectId, token]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { loadMembers() }, [loadMembers])
+
+  async function handleInvite() {
+    if (!inviteEmail.trim()) return
+    setInviting(true)
+    try {
+      await apiFetch(`/${projectId}/members`, token, {
+        method: 'POST',
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      })
+      setInviteEmail('')
+      toast('Membro adicionado com sucesso!', 'success')
+      await loadMembers()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao convidar membro.', 'error')
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  async function handleRoleChange(memberId: string, newRole: 'editor' | 'viewer') {
+    setUpdatingRole(memberId)
+    try {
+      await apiFetch(`/${projectId}/members/${memberId}`, token, {
+        method: 'PATCH',
+        body: JSON.stringify({ role: newRole }),
+      })
+      setMembers((prev) =>
+        prev.map((m) => m.user_id === memberId ? { ...m, role: newRole } : m)
+      )
+      toast('Role atualizada.', 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao atualizar role.', 'error')
+    } finally {
+      setUpdatingRole(null)
+    }
+  }
+
+  async function handleRemove(memberId: string) {
+    setRemovingMember(memberId)
+    try {
+      await apiFetch(`/${projectId}/members/${memberId}`, token, { method: 'DELETE' })
+      setMembers((prev) => prev.filter((m) => m.user_id !== memberId))
+      toast('Membro removido.', 'info')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao remover membro.', 'error')
+    } finally {
+      setRemovingMember(null)
+    }
+  }
+
+  return (
+    <Card padding="none">
+      {/* Member list */}
+      <div className="divide-y divide-stone/30">
+        {loadingMembers ? (
+          <div className="px-5 py-4 flex flex-col gap-3">
+            {[1, 2].map((i) => (
+              <div key={i} className="h-10 rounded-xl bg-stone/20 animate-pulse" />
+            ))}
+          </div>
+        ) : members.length === 0 ? (
+          <div className="px-5 py-6 text-center text-sm text-muted">Nenhum membro encontrado.</div>
+        ) : (
+          members.map((m) => (
+            <div key={m.user_id} className="px-5 py-3.5 flex items-center gap-3">
+              {/* Avatar */}
+              <div className="h-9 w-9 rounded-full bg-brand-light flex items-center justify-center shrink-0 overflow-hidden">
+                {m.avatar_url ? (
+                  <img src={m.avatar_url} alt={m.email} className="h-9 w-9 object-cover" />
+                ) : (
+                  <span className="text-xs font-bold text-brand">{getInitials(m.email)}</span>
+                )}
+              </div>
+
+              {/* Email + name */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-ink truncate">{m.full_name ?? m.email}</p>
+                {m.full_name && (
+                  <p className="text-xs text-muted truncate">{m.email}</p>
+                )}
+              </div>
+
+              {/* Role: badge for owner, dropdown for others when isOwner */}
+              {m.role === 'owner' || !isOwner ? (
+                <RoleBadge role={m.role} />
+              ) : (
+                <select
+                  value={m.role}
+                  disabled={updatingRole === m.user_id}
+                  onChange={(e) => handleRoleChange(m.user_id, e.target.value as 'editor' | 'viewer')}
+                  className="text-xs border border-stone rounded-lg px-2 py-1 bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
+                >
+                  <option value="editor">Editor</option>
+                  <option value="viewer">Viewer</option>
+                </select>
+              )}
+
+              {/* Remove button (owner only, not for the owner themselves) */}
+              {isOwner && m.role !== 'owner' && (
+                <button
+                  onClick={() => handleRemove(m.user_id)}
+                  disabled={removingMember === m.user_id}
+                  title="Remover membro"
+                  className="h-8 w-8 flex items-center justify-center rounded-lg text-muted hover:text-[#A32D2D] hover:bg-[#F7C1C1]/20 transition-colors disabled:opacity-40 shrink-0"
+                >
+                  {removingMember === m.user_id ? (
+                    <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    </svg>
+                  )}
+                </button>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Invite form (owner only) */}
+      {isOwner && (
+        <div className="px-5 py-4 border-t border-stone/40 bg-parchment/50 rounded-b-2xl">
+          <p className="text-xs font-semibold text-ink mb-3">Convidar por e-mail</p>
+          <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+            <input
+              type="email"
+              placeholder="email@exemplo.com"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
+              className="flex-1 min-w-0 h-9 rounded-xl border border-stone bg-surface px-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
+            />
+            <select
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as 'editor' | 'viewer')}
+              className="h-9 rounded-xl border border-stone bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand/20 shrink-0"
+            >
+              <option value="viewer">Viewer</option>
+              <option value="editor">Editor</option>
+            </select>
+            <Button
+              size="sm"
+              onClick={handleInvite}
+              loading={inviting}
+              disabled={!inviteEmail.trim()}
+            >
+              Convidar
+            </Button>
+          </div>
+          <div className="mt-2.5 flex flex-col gap-1 text-xs text-muted">
+            <span><strong className="text-blue-600">Editor</strong> — pode fazer upload e deletar arquivos</span>
+            <span><strong className="text-stone-500">Viewer</strong> — pode apenas visualizar e conversar via chat</span>
+          </div>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+// ── Google Drive Integrations Section ────────────────────────────────────────
+
+function GoogleDriveIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+      <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+      <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+      <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+      <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+      <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+      <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+    </svg>
+  )
+}
+
+function formatSyncTime(iso: string | null): string {
+  if (!iso) return 'Nunca sincronizado'
+  const d = new Date(iso)
+  return d.toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
+function IntegrationsSection({
+  projectId,
+  token,
+  isOwner,
+  toast,
+  onGdriveConnected,
+}: {
+  projectId: string
+  token: string
+  isOwner: boolean
+  toast: (msg: string, type: 'success' | 'error' | 'info' | 'warning') => void
+  onGdriveConnected: boolean   // true when redirected back from OAuth
+}) {
+  const [integration, setIntegration]   = useState<GoogleDriveIntegration | null | undefined>(undefined)
+  const [folders, setFolders]           = useState<DriveFolder[]>([])
+  const [loadingFolders, setLoadingFolders] = useState(false)
+  const [selectedFolder, setSelectedFolder] = useState<DriveFolder | null>(null)
+  const [savingFolder, setSavingFolder] = useState(false)
+  const [connecting, setConnecting]     = useState(false)
+  const [syncing, setSyncing]           = useState(false)
+  const [removing, setRemoving]         = useState(false)
+
+  // Load integration status
+  const loadIntegration = useCallback(async () => {
+    try {
+      const data = await apiFetch<GoogleDriveIntegration | null>(
+        `/${projectId}/integrations/google`, token
+      )
+      setIntegration(data)
+      if (data?.folder_id) {
+        setSelectedFolder({ id: data.folder_id, name: data.folder_name ?? '' })
+      }
+    } catch {
+      setIntegration(null)
+    }
+  }, [projectId, token]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (token && isOwner) loadIntegration()
+  }, [token, isOwner, loadIntegration])
+
+  // If just returned from OAuth, reload and show toast
+  useEffect(() => {
+    if (onGdriveConnected && token && isOwner) {
+      loadIntegration().then(() => toast('Google Drive conectado com sucesso!', 'success'))
+    }
+  }, [onGdriveConnected]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load folders when integration is loaded (if connected)
+  useEffect(() => {
+    if (!integration?.id || folders.length > 0) return
+    setLoadingFolders(true)
+    apiFetch<DriveFolder[]>(`/${projectId}/integrations/google/folders`, token)
+      .then(setFolders)
+      .catch(() => {})
+      .finally(() => setLoadingFolders(false))
+  }, [integration?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleConnect() {
+    setConnecting(true)
+    try {
+      const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000')
+      const res = await fetch(
+        `${apiBase}/api/integrations/google/authorize?project_id=${projectId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.detail ?? 'Erro ao obter URL de autorização')
+      }
+      const data = await res.json()
+      if (!data.oauth_url) throw new Error('URL de autorização inválida')
+      window.location.href = data.oauth_url
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao iniciar conexão.', 'error')
+      setConnecting(false)
+    }
+  }
+
+  async function handleSaveFolder() {
+    if (!selectedFolder) return
+    setSavingFolder(true)
+    try {
+      const updated = await apiFetch<GoogleDriveIntegration>(
+        `/${projectId}/integrations/google`, token, {
+          method: 'PATCH',
+          body: JSON.stringify({ folder_id: selectedFolder.id, folder_name: selectedFolder.name }),
+        }
+      )
+      setIntegration(updated)
+      toast('Pasta vinculada com sucesso!', 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao salvar pasta.', 'error')
+    } finally {
+      setSavingFolder(false)
+    }
+  }
+
+  async function handleSync() {
+    setSyncing(true)
+    try {
+      await apiFetch(`/${projectId}/integrations/google/sync`, token, { method: 'POST' })
+      toast('Sincronização iniciada! Os documentos aparecerão em breve.', 'info')
+      // Poll para atualizar o timestamp
+      setTimeout(async () => {
+        await loadIntegration()
+        setSyncing(false)
+      }, 4000)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao sincronizar.', 'error')
+      setSyncing(false)
+    }
+  }
+
+  async function handleRemove() {
+    setRemoving(true)
+    try {
+      await apiFetch(`/${projectId}/integrations/google`, token, { method: 'DELETE' })
+      setIntegration(null)
+      setFolders([])
+      setSelectedFolder(null)
+      toast('Integração removida.', 'info')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao remover integração.', 'error')
+    } finally {
+      setRemoving(false)
+    }
+  }
+
+  // Non-owner sees a read-only status (no API call needed for basic view)
+  if (!isOwner) {
+    return (
+      <Card padding="lg">
+        <div className="flex items-center gap-3 text-sm text-muted">
+          <GoogleDriveIcon size={18} />
+          {integration
+            ? <span>Google Drive conectado como <strong className="text-ink">{integration.google_email}</strong></span>
+            : <span>Nenhuma integração ativa.</span>
+          }
+        </div>
+      </Card>
+    )
+  }
+
+  // Loading state (owner only)
+  if (integration === undefined) {
+    return (
+      <Card padding="lg">
+        <div className="h-10 rounded-xl bg-stone/20 animate-pulse" />
+      </Card>
+    )
+  }
+
+  // ── Not connected ──
+  if (!integration) {
+    return (
+      <Card padding="lg">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-stone/10 border border-stone/30 flex items-center justify-center shrink-0">
+              <GoogleDriveIcon size={22} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-ink">Google Drive</p>
+              <p className="text-xs text-muted mt-0.5">Não conectado</p>
+            </div>
+          </div>
+          <Button onClick={handleConnect} loading={connecting} size="sm">
+            <GoogleDriveIcon size={15} />
+            Conectar Google Drive
+          </Button>
+        </div>
+      </Card>
+    )
+  }
+
+  // ── Connected ──
+  const folderChanged = selectedFolder?.id !== integration.folder_id
+
+  return (
+    <Card padding="none">
+      {/* Header: connected account */}
+      <div className="px-5 py-4 flex items-center gap-3 border-b border-stone/30">
+        <div className="h-10 w-10 rounded-xl bg-stone/10 border border-stone/30 flex items-center justify-center shrink-0">
+          <GoogleDriveIcon size={22} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-ink">Google Drive</p>
+          <p className="text-xs text-muted truncate">{integration.google_email}</p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          Conectado
+        </span>
+      </div>
+
+      {/* Folder selector */}
+      <div className="px-5 py-4 border-b border-stone/30">
+        <p className="text-xs font-semibold text-ink mb-2">Pasta vinculada ao projeto</p>
+        {loadingFolders ? (
+          <div className="h-9 rounded-xl bg-stone/20 animate-pulse" />
+        ) : folders.length === 0 ? (
+          <p className="text-xs text-muted">Nenhuma pasta encontrada no Drive.</p>
+        ) : (
+          <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+            <select
+              value={selectedFolder?.id ?? ''}
+              onChange={(e) => {
+                const f = folders.find((x) => x.id === e.target.value) ?? null
+                setSelectedFolder(f)
+              }}
+              className="flex-1 h-9 rounded-xl border border-stone bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand/20"
+            >
+              <option value="">— Selecione uma pasta —</option>
+              {folders.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              onClick={handleSaveFolder}
+              loading={savingFolder}
+              disabled={!selectedFolder || !folderChanged}
+            >
+              Salvar pasta
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Sync controls */}
+      <div className="px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold text-ink">Última sincronização</p>
+          <p className="text-xs text-muted mt-0.5">{formatSyncTime(integration.last_synced_at)}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={handleSync}
+            loading={syncing}
+            disabled={!integration.folder_id}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            Sincronizar agora
+          </Button>
+          <button
+            onClick={handleRemove}
+            disabled={removing}
+            title="Remover integração"
+            className="h-9 w-9 flex items-center justify-center rounded-xl border border-stone text-muted hover:text-[#A32D2D] hover:border-[#F7C1C1] hover:bg-[#F7C1C1]/20 transition-colors disabled:opacity-40"
+          >
+            {removing ? (
+              <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {!integration.folder_id && (
+        <div className="px-5 pb-4">
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+            Selecione e salve uma pasta para habilitar a sincronização.
+          </p>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+// ── Settings Page (inner — uses useSearchParams) ──────────────────────────────
+
+function SettingsPageInner() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const projectId = params.id as string
   const supabase = createClient()
   const { toasts, toast, close } = useToast()
 
+  const gdriveConnected = searchParams.get('gdrive_connected') === '1'
+  const gdriveError     = searchParams.get('gdrive_error')
+
   const [token, setToken] = useState('')
+  const [currentUserId, setCurrentUserId] = useState('')
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -255,6 +787,12 @@ export default function SettingsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
+  // ── Show gdrive error if redirected back with error ───────────────────────
+
+  useEffect(() => {
+    if (gdriveError) toast('Erro ao conectar o Google Drive. Tente novamente.', 'error')
+  }, [gdriveError]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Init ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -262,6 +800,7 @@ export default function SettingsPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.replace('/login'); return }
       setToken(session.access_token)
+      setCurrentUserId(session.user.id)
 
       try {
         const projects = await apiFetch<Project[]>('', session.access_token)
@@ -290,6 +829,8 @@ export default function SettingsPage() {
 
     init()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isOwner = Boolean(project && currentUserId && project.user_id === currentUserId)
 
   // ── Save general ──────────────────────────────────────────────────────────
 
@@ -414,6 +955,7 @@ export default function SettingsPage() {
                       onChange={(e) => { setName(e.target.value); setNameError('') }}
                       error={nameError}
                       maxLength={120}
+                      disabled={!isOwner}
                     />
 
                     <div className="flex flex-col gap-1.5">
@@ -426,19 +968,57 @@ export default function SettingsPage() {
                         onChange={(e) => setDescription(e.target.value)}
                         maxLength={500}
                         rows={3}
-                        className="w-full rounded-xl border border-stone hover:border-stone/70 bg-surface px-4 py-3 text-sm text-ink placeholder:text-muted resize-none focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
+                        disabled={!isOwner}
+                        className="w-full rounded-xl border border-stone hover:border-stone/70 bg-surface px-4 py-3 text-sm text-ink placeholder:text-muted resize-none focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                         placeholder="Breve descrição do projeto…"
                       />
                       <p className="text-xs text-muted text-right">{description.length}/500</p>
                     </div>
 
-                    <div className="flex justify-end">
-                      <Button onClick={handleSave} loading={saving} disabled={name === project?.name && (description || '') === (project?.description ?? '')}>
-                        Salvar alterações
-                      </Button>
-                    </div>
+                    {isOwner && (
+                      <div className="flex justify-end">
+                        <Button onClick={handleSave} loading={saving} disabled={name === project?.name && (description || '') === (project?.description ?? '')}>
+                          Salvar alterações
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </Card>
+              </Section>
+
+              <Divider />
+
+              {/* ── Members ── */}
+              <Section
+                title="Membros e Permissões"
+                subtitle="Gerencie quem tem acesso a este projeto e seus níveis de permissão."
+              >
+                {token && (
+                  <MembersSection
+                    projectId={projectId}
+                    token={token}
+                    isOwner={isOwner}
+                    toast={toast}
+                  />
+                )}
+              </Section>
+
+              <Divider />
+
+              {/* ── Integrations ── */}
+              <Section
+                title="Integrações"
+                subtitle="Conecte fontes externas para sincronizar documentos automaticamente."
+              >
+                {token && (
+                  <IntegrationsSection
+                    projectId={projectId}
+                    token={token}
+                    isOwner={isOwner}
+                    toast={toast}
+                    onGdriveConnected={gdriveConnected}
+                  />
+                )}
               </Section>
 
               <Divider />
@@ -536,47 +1116,51 @@ export default function SettingsPage() {
                       </p>
                     </div>
 
-                    <div className="flex justify-end">
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowRegenerateModal(true)}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                        </svg>
-                        Regenerar API key
-                      </Button>
-                    </div>
+                    {isOwner && (
+                      <div className="flex justify-end">
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowRegenerateModal(true)}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                          </svg>
+                          Regenerar API key
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </Card>
               </Section>
 
               <Divider />
 
-              {/* ── Danger Zone ── */}
-              <Section
-                title="Zona de perigo"
-                subtitle="Ações irreversíveis. Proceda com cautela."
-                danger
-              >
-                <div className="border border-[#F7C1C1] rounded-xl p-4">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-semibold text-[#A32D2D]">Excluir este projeto</p>
-                      <p className="text-xs text-muted mt-0.5 leading-relaxed">
-                        Remove o projeto, todos os documentos, vetores no Qdrant e histórico de chat. Esta ação não pode ser desfeita.
-                      </p>
+              {/* ── Danger Zone (owner only) ── */}
+              {isOwner && (
+                <Section
+                  title="Zona de perigo"
+                  subtitle="Ações irreversíveis. Proceda com cautela."
+                  danger
+                >
+                  <div className="border border-[#F7C1C1] rounded-xl p-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-[#A32D2D]">Excluir este projeto</p>
+                        <p className="text-xs text-muted mt-0.5 leading-relaxed">
+                          Remove o projeto, todos os documentos, vetores no Qdrant e histórico de chat. Esta ação não pode ser desfeita.
+                        </p>
+                      </div>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => setShowDeleteModal(true)}
+                      >
+                        Excluir projeto
+                      </Button>
                     </div>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => setShowDeleteModal(true)}
-                    >
-                      Excluir projeto
-                    </Button>
                   </div>
-                </div>
-              </Section>
+                </Section>
+              )}
 
             </div>
           )}
@@ -602,5 +1186,15 @@ export default function SettingsPage() {
 
       <ToastContainer toasts={toasts} onClose={close} />
     </>
+  )
+}
+
+// ── Export wrapped in Suspense (required for useSearchParams in App Router) ───
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsPageInner />
+    </Suspense>
   )
 }
