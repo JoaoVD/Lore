@@ -526,7 +526,7 @@ function IntegrationsSection({
 
   // Load folders when integration is loaded (if connected)
   useEffect(() => {
-    if (!integration?.id || folders.length > 0) return
+    if (!integration?.connected || folders.length > 0) return
     setLoadingFolders(true)
     const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
     fetch(`${apiBase}/api/integrations/google-drive/folders`, {
@@ -614,8 +614,8 @@ function IntegrationsSection({
       <Card padding="lg">
         <div className="flex items-center gap-3 text-sm text-muted">
           <GoogleDriveIcon size={18} />
-          {integration
-            ? <span>Google Drive conectado como <strong className="text-ink">{integration.google_email}</strong></span>
+          {integration?.connected
+            ? <span>Google Drive conectado</span>
             : <span>Nenhuma integração ativa.</span>
           }
         </div>
@@ -633,7 +633,7 @@ function IntegrationsSection({
   }
 
   // ── Not connected ──
-  if (!integration) {
+  if (!integration?.connected) {
     return (
       <Card padding="lg">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -667,7 +667,7 @@ function IntegrationsSection({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-ink">Google Drive</p>
-          <p className="text-xs text-muted truncate">{integration.google_email}</p>
+          <p className="text-xs text-muted truncate">Google Drive conectado</p>
         </div>
         <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
