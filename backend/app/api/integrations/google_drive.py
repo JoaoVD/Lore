@@ -135,21 +135,22 @@ def _build_flow() -> Flow:
     )
 
 
-def _encode_state(user_id: str) -> str:
-    """Codifica o user_id em um JWT assinado para ser passado como state no OAuth."""
+def _encode_state(user_id: str, project_id: str | None = None) -> str:
+    """Codifica o user_id (e opcionalmente project_id) em um JWT assinado para o state OAuth."""
     payload = {
         "user_id": user_id,
+        "project_id": project_id,
         "nonce": secrets.token_hex(8),
         "exp": datetime.utcnow() + timedelta(minutes=_STATE_TTL_MINUTES),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def _decode_state(state: str) -> str:
-    """Decodifica e valida o state JWT. Retorna o user_id."""
+def _decode_state(state: str) -> tuple[str, str | None]:
+    """Decodifica e valida o state JWT. Retorna (user_id, project_id)."""
     try:
         payload = jwt.decode(state, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload["user_id"]
+        return payload["user_id"], payload.get("project_id")
     except (JWTError, KeyError):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -416,13 +417,14 @@ def _sync_drive_folder_bg(
 )
 async def google_drive_auth(
     user: AuthUser = Depends(get_current_user),
+    project_id: str | None = Query(None, description="ID do projeto para redirecionar após OAuth"),
 ) -> AuthUrlResponse:
     """
     Retorna a URL de autorização do Google Drive.
     O frontend deve redirecionar o usuário para essa URL.
     """
     flow = _build_flow()
-    state = _encode_state(user.id)
+    state = _encode_state(user.id, project_id)
     auth_url, _ = flow.authorization_url(
         access_type="offline",      # solicita refresh_token
         include_granted_scopes="true",
@@ -447,15 +449,24 @@ async def google_drive_callback(
     Recebe o código OAuth do Google, troca por tokens e salva na tabela `integrations`.
     Redireciona para o frontend após o processo.
     """
-    frontend_base = f"{settings.FRONTEND_URL}/integrations"
+    # Valida state e extrai user_id + project_id (mesmo em caso de erro, para redirecionar certo)
+    try:
+        user_id, project_id = _decode_state(state)
+    except HTTPException:
+        user_id, project_id = None, None
+
+    def _redirect_url(param: str) -> str:
+        if project_id:
+            return f"{settings.FRONTEND_URL}/project/{project_id}/settings?{param}"
+        return f"{settings.FRONTEND_URL}/dashboard?{param}"
 
     # Usuário negou acesso
     if error:
         logger.warning("[gdrive callback] Acesso negado pelo usuário: %s", error)
-        return RedirectResponse(url=f"{frontend_base}?status=denied")
+        return RedirectResponse(url=_redirect_url("gdrive_error=denied"))
 
-    # Valida state e extrai user_id
-    user_id = _decode_state(state)
+    if not user_id:
+        return RedirectResponse(url=_redirect_url("gdrive_error=invalid_state"))
 
     # Troca o code por tokens
     try:
@@ -464,7 +475,7 @@ async def google_drive_callback(
         creds = flow.credentials
     except Exception as exc:
         logger.error("[gdrive callback] Falha ao trocar code por tokens: %s", exc)
-        return RedirectResponse(url=f"{frontend_base}?status=error")
+        return RedirectResponse(url=_redirect_url("gdrive_error=token_exchange"))
 
     expires_at = (
         creds.expiry.replace(tzinfo=timezone.utc).isoformat()
@@ -482,8 +493,8 @@ async def google_drive_callback(
         "updated_at":    datetime.utcnow().isoformat(),
     }, on_conflict="user_id,provider").execute()
 
-    logger.info("[gdrive callback] Tokens salvos | user=%s", user_id)
-    return RedirectResponse(url=f"{frontend_base}?status=connected")
+    logger.info("[gdrive callback] Tokens salvos | user=%s project=%s", user_id, project_id)
+    return RedirectResponse(url=_redirect_url("gdrive_connected=1"))
 
 
 @integrations_router.get(
