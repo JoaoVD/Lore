@@ -25,6 +25,8 @@ Rotas de projeto (prefixo /api/projects):
   DELETE /{project_id}/integrations/google-drive          → Remove vinculação
 """
 
+import base64
+import hashlib
 import io
 import logging
 import os
@@ -135,22 +137,32 @@ def _build_flow() -> Flow:
     )
 
 
-def _encode_state(user_id: str, project_id: str | None = None) -> str:
-    """Codifica o user_id (e opcionalmente project_id) em um JWT assinado para o state OAuth."""
+def _generate_pkce_pair() -> tuple[str, str]:
+    """Gera (code_verifier, code_challenge) para o fluxo PKCE."""
+    code_verifier = base64.urlsafe_b64encode(os.urandom(40)).decode().rstrip("=")
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode()).digest()
+    ).decode().rstrip("=")
+    return code_verifier, code_challenge
+
+
+def _encode_state(user_id: str, project_id: str | None = None, code_verifier: str | None = None) -> str:
+    """Codifica user_id, project_id e code_verifier PKCE em um JWT assinado para o state OAuth."""
     payload = {
         "user_id": user_id,
         "project_id": project_id,
+        "code_verifier": code_verifier,
         "nonce": secrets.token_hex(8),
         "exp": datetime.utcnow() + timedelta(minutes=_STATE_TTL_MINUTES),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def _decode_state(state: str) -> tuple[str, str | None]:
-    """Decodifica e valida o state JWT. Retorna (user_id, project_id)."""
+def _decode_state(state: str) -> tuple[str, str | None, str | None]:
+    """Decodifica e valida o state JWT. Retorna (user_id, project_id, code_verifier)."""
     try:
         payload = jwt.decode(state, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload["user_id"], payload.get("project_id")
+        return payload["user_id"], payload.get("project_id"), payload.get("code_verifier")
     except (JWTError, KeyError):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -390,9 +402,9 @@ def _sync_drive_folder_bg(
                 except Exception:
                     pass
 
-    # Atualiza last_synced_at após processar todos os arquivos
+    # Atualiza last_sync_at após processar todos os arquivos
     supabase.table("project_integrations").update({
-        "last_synced_at": datetime.utcnow().isoformat(),
+        "last_sync_at": datetime.utcnow().isoformat(),
     }).eq("project_id", project_id).eq("provider", "google_drive").execute()
 
     logger.info(
@@ -424,12 +436,15 @@ async def google_drive_auth(
     O frontend deve redirecionar o usuário para essa URL.
     """
     flow = _build_flow()
-    state = _encode_state(user.id, project_id)
+    code_verifier, code_challenge = _generate_pkce_pair()
+    state = _encode_state(user.id, project_id, code_verifier)
     auth_url, _ = flow.authorization_url(
-        access_type="offline",      # solicita refresh_token
+        access_type="offline",
         include_granted_scopes="true",
-        prompt="consent",           # garante que o refresh_token seja retornado
+        prompt="consent",
         state=state,
+        code_challenge=code_challenge,
+        code_challenge_method="S256",
     )
     return AuthUrlResponse(auth_url=auth_url)
 
@@ -449,11 +464,11 @@ async def google_drive_callback(
     Recebe o código OAuth do Google, troca por tokens e salva na tabela `integrations`.
     Redireciona para o frontend após o processo.
     """
-    # Valida state e extrai user_id + project_id (mesmo em caso de erro, para redirecionar certo)
+    # Valida state e extrai user_id, project_id e code_verifier PKCE
     try:
-        user_id, project_id = _decode_state(state)
+        user_id, project_id, code_verifier = _decode_state(state)
     except HTTPException:
-        user_id, project_id = None, None
+        user_id, project_id, code_verifier = None, None, None
 
     def _redirect_url(param: str) -> str:
         if project_id:
@@ -468,10 +483,10 @@ async def google_drive_callback(
     if not user_id:
         return RedirectResponse(url=_redirect_url("gdrive_error=invalid_state"))
 
-    # Troca o code por tokens
+    # Troca o code por tokens (passa code_verifier para validação PKCE)
     try:
         flow = _build_flow()
-        flow.fetch_token(code=code)
+        flow.fetch_token(code=code, code_verifier=code_verifier)
         creds = flow.credentials
     except Exception as exc:
         logger.error("[gdrive callback] Falha ao trocar code por tokens: %s", exc)
@@ -576,7 +591,7 @@ async def get_project_integration_status(
     # Verifica se há pasta vinculada ao projeto
     proj_int = (
         supabase.table("project_integrations")
-        .select("folder_id, folder_name, last_synced_at")
+        .select("folder_id, folder_name, last_sync_at")
         .eq("project_id", project_id)
         .eq("provider", "google_drive")
         .execute()
@@ -595,7 +610,7 @@ async def get_project_integration_status(
         connected=connected,
         folder_id=row["folder_id"],
         folder_name=row["folder_name"],
-        last_synced_at=row.get("last_synced_at"),
+        last_synced_at=row.get("last_sync_at"),
     )
 
 
