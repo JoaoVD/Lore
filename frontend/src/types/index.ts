@@ -51,13 +51,10 @@ export interface ProjectMember {
 }
 
 export interface GoogleDriveIntegration {
-  id: string
-  project_id: string
-  google_email: string
+  connected: boolean
   folder_id: string | null
   folder_name: string | null
   last_synced_at: string | null
-  created_at: string
 }
 
 export interface DriveFolder {
