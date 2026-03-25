@@ -535,7 +535,7 @@ function IntegrationsSection({
       .then(setFolders)
       .catch(() => {})
       .finally(() => setLoadingFolders(false))
-  }, [integration?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [integration?.connected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleConnect() {
     setConnecting(true)
