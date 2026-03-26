@@ -178,21 +178,27 @@ def _get_credentials(user_id: str, supabase: Client) -> Credentials:
     Raises:
         HTTP 401 se o usuário não tiver o Drive conectado.
     """
-    row = (
-        supabase.table("integrations")
-        .select("access_token, refresh_token, expires_at")
-        .eq("user_id", user_id)
-        .eq("provider", "google_drive")
-        .single()
-        .execute()
-    )
+    try:
+        row = (
+            supabase.table("integrations")
+            .select("access_token, refresh_token, expires_at")
+            .eq("user_id", user_id)
+            .eq("provider", "google_drive")
+            .limit(1)
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro ao consultar credenciais do Google Drive",
+        )
     if not row.data:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Google Drive não conectado. Acesse /api/integrations/google-drive/auth",
         )
 
-    data = row.data
+    data = row.data[0]
     expiry = (
         datetime.fromisoformat(data["expires_at"]).replace(tzinfo=timezone.utc)
         if data.get("expires_at")
@@ -668,14 +674,20 @@ async def sync_drive_folder(
     Exige role mínimo: editor.
     """
     # Busca a pasta vinculada
-    proj_int = (
-        supabase.table("project_integrations")
-        .select("folder_id, folder_name")
-        .eq("project_id", project_id)
-        .eq("provider", "google_drive")
-        .single()
-        .execute()
-    )
+    try:
+        proj_int = (
+            supabase.table("project_integrations")
+            .select("folder_id, folder_name")
+            .eq("project_id", project_id)
+            .eq("provider", "google_drive")
+            .limit(1)
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro ao consultar integrações do projeto",
+        )
     if not proj_int.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -683,8 +695,8 @@ async def sync_drive_folder(
                    "Use POST /integrations/google-drive primeiro.",
         )
 
-    folder_id = proj_int.data["folder_id"]
-    folder_name = proj_int.data["folder_name"]
+    folder_id = proj_int.data[0]["folder_id"]
+    folder_name = proj_int.data[0]["folder_name"]
 
     # Valida credenciais antes de enfileirar (falha rápido se não conectado)
     _get_credentials(access.owner_id, supabase)

@@ -70,7 +70,8 @@ async function apiFetch<T>(
     )
   }
   if (res.status === 204) return undefined as T
-  return res.json()
+  const text = await res.text()
+  return (text ? JSON.parse(text) : undefined) as T
 }
 
 // Upload via XHR to support progress events

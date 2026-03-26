@@ -243,7 +243,7 @@ async def list_files(
         .order("created_at", desc=True)
         .execute()
     )
-    return result.data
+    return result.data or []
 
 
 @router.delete("/{project_id}/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -256,18 +256,21 @@ async def delete_file(
     """Remove um arquivo: Storage, vetores no Qdrant e registro no banco. Exige role mínimo: editor."""
     owner_id = access.owner_id
 
-    doc_result = (
-        supabase.table("documents")
-        .select("*")
-        .eq("id", file_id)
-        .eq("project_id", project_id)
-        .single()
-        .execute()
-    )
+    try:
+        doc_result = (
+            supabase.table("documents")
+            .select("*")
+            .eq("id", file_id)
+            .eq("project_id", project_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(status_code=500, detail="Erro ao consultar o banco de dados")
     if not doc_result.data:
         raise HTTPException(status_code=404, detail="Arquivo não encontrado")
 
-    doc = doc_result.data
+    doc = doc_result.data[0]
     file_name = doc["file_name"]
 
     # 1. Remove do Supabase Storage
@@ -370,7 +373,7 @@ async def get_history(
         .limit(min(limit, 200))
         .execute()
     )
-    return result.data
+    return result.data or []
 
 
 # ── Members ───────────────────────────────────────────────────────────────────
