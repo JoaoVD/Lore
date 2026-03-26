@@ -160,6 +160,7 @@ const PLANS: Plan[] = [
 export default function LandingPage() {
   const [annual, setAnnual] = useState(false)
   const [navScrolled, setNavScrolled] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     const fonts = document.createElement('link')
@@ -171,6 +172,12 @@ export default function LandingPage() {
     window.addEventListener('scroll', onScroll)
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  // Bloqueia scroll do body quando menu mobile aberto
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [menuOpen])
 
   const css = `
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -195,8 +202,25 @@ export default function LandingPage() {
     .anim-2 { animation: fadeUp .6s .2s ease both; }
     .anim-3 { animation: fadeUp .6s .3s ease both; }
     .anim-4 { animation: fadeUp .6s .4s ease both; }
+    .hamburger-btn { display: none; background: none; border: none; cursor: pointer; padding: 6px; border-radius: 8px; transition: background .2s; }
+    .hamburger-btn:hover { background: rgba(15,110,86,0.08); }
+    .mobile-overlay { display: none; position: fixed; inset: 0; zIndex: 150; }
+    .mobile-overlay.open { display: block; }
+    .mobile-backdrop { position: absolute; inset: 0; background: rgba(28,28,26,0.45); backdrop-filter: blur(2px); }
+    .mobile-drawer { position: absolute; top: 0; right: 0; bottom: 0; width: min(300px, 82vw); background: #F1EFE8; display: flex; flex-direction: column; padding: 0; box-shadow: -4px 0 24px rgba(28,28,26,0.15); transform: translateX(100%); transition: transform .28s cubic-bezier(.4,0,.2,1); }
+    .mobile-overlay.open .mobile-drawer { transform: translateX(0); }
+    .mobile-drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid rgba(200,198,188,0.6); }
+    .mobile-drawer-close { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 8px; color: #3A3A38; transition: background .2s; }
+    .mobile-drawer-close:hover { background: rgba(15,110,86,0.08); }
+    .mobile-nav-links { flex: 1; display: flex; flex-direction: column; padding: 12px 0; overflow-y: auto; }
+    .mobile-nav-section { padding: 6px 20px 2px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #7A7870; }
+    .mobile-nav-link { display: flex; align-items: center; gap: 12px; padding: 13px 20px; font-size: 15px; color: #3A3A38; text-decoration: none; transition: background .15s, color .15s; }
+    .mobile-nav-link:hover { background: rgba(15,110,86,0.07); color: #085041; }
+    .mobile-nav-divider { height: 1px; background: rgba(200,198,188,0.5); margin: 8px 20px; }
+    .mobile-nav-cta { margin: 12px 20px 0; }
     @media (max-width: 768px) {
       .nav-links-desk { display: none !important; }
+      .hamburger-btn { display: flex !important; align-items: center; justify-content: center; }
       .hero-h1 { font-size: 42px !important; }
       .hero-actions { flex-direction: column; align-items: center; }
       .three-cols { grid-template-columns: 1fr !important; }
@@ -215,7 +239,7 @@ export default function LandingPage() {
         backdropFilter: 'blur(12px)',
         borderBottom: navScrolled ? '1px solid rgba(200,198,188,0.6)' : '1px solid transparent',
         height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 40px', transition: 'background .3s, border-color .3s',
+        padding: '0 24px', transition: 'background .3s, border-color .3s',
       }}>
         <a href="#" style={{ textDecoration: 'none' }}><Logo size="md" /></a>
         <div className="nav-links-desk" style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
@@ -225,7 +249,98 @@ export default function LandingPage() {
           <a href="/login" className="nav-link">Entrar</a>
           <a href="/register" className="btn-primary" style={{ padding: '7px 18px', fontSize: 14 }}>Começar grátis</a>
         </div>
+
+        {/* Botão hamburguer — visível só no mobile */}
+        <button
+          className="hamburger-btn"
+          aria-label="Abrir menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(true)}
+        >
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <rect y="4" width="22" height="2" rx="1" fill="#3A3A38"/>
+            <rect y="10" width="22" height="2" rx="1" fill="#3A3A38"/>
+            <rect y="16" width="22" height="2" rx="1" fill="#3A3A38"/>
+          </svg>
+        </button>
       </nav>
+
+      {/* ── MOBILE MENU DRAWER ── */}
+      <div className={`mobile-overlay${menuOpen ? ' open' : ''}`} role="dialog" aria-modal="true" aria-label="Menu de navegação">
+        {/* Backdrop — clica fora para fechar */}
+        <div className="mobile-backdrop" onClick={() => setMenuOpen(false)} />
+
+        <div className="mobile-drawer">
+          {/* Header do drawer */}
+          <div className="mobile-drawer-header">
+            <Logo size="md" />
+            <button className="mobile-drawer-close" aria-label="Fechar menu" onClick={() => setMenuOpen(false)}>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M4 4L16 16M16 4L4 16" stroke="#3A3A38" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+
+          <div className="mobile-nav-links">
+            {/* Navegação da página */}
+            <span className="mobile-nav-section">Produto</span>
+            <a href="#demo" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="3" stroke="#0F6E56" strokeWidth="1.5"/><path d="M5 8h6M8 5v6" stroke="#0F6E56" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              O que é o Lore
+            </a>
+            <a href="#how" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="#0F6E56" strokeWidth="1.5"/><path d="M8 5v4l2.5 2.5" stroke="#0F6E56" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              Como funciona
+            </a>
+            <a href="#pricing" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8h12M8 2l4 6-4 6-4-6 4-6z" stroke="#0F6E56" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Preços
+            </a>
+
+            <div className="mobile-nav-divider" />
+
+            {/* Conta */}
+            <span className="mobile-nav-section">Conta</span>
+            <a href="/login" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="2.5" stroke="#0F6E56" strokeWidth="1.5"/><path d="M2.5 13.5c0-3.038 2.462-5.5 5.5-5.5s5.5 2.462 5.5 5.5" stroke="#0F6E56" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              Entrar
+            </a>
+            <a href="/register" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10.5 3.5h2a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1h2" stroke="#0F6E56" strokeWidth="1.5" strokeLinecap="round"/><path d="M8 1v6M5.5 4.5L8 7l2.5-2.5" stroke="#0F6E56" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Criar conta grátis
+            </a>
+
+            <div className="mobile-nav-divider" />
+
+            {/* Legal */}
+            <span className="mobile-nav-section">Legal & Suporte</span>
+            <a href="/terms" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="1.5" width="11" height="13" rx="1.5" stroke="#7A7870" strokeWidth="1.5"/><path d="M5 5.5h6M5 8h6M5 10.5h3.5" stroke="#7A7870" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              <span style={{ color: '#7A7870' }}>Termos de uso</span>
+            </a>
+            <a href="/privacy" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L2.5 4v4c0 3.038 2.462 5.5 5.5 5.5s5.5-2.462 5.5-5.5V4L8 1.5z" stroke="#7A7870" strokeWidth="1.5" strokeLinejoin="round"/></svg>
+              <span style={{ color: '#7A7870' }}>Privacidade</span>
+            </a>
+            <a href="/contact" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3.5" width="13" height="9" rx="1.5" stroke="#7A7870" strokeWidth="1.5"/><path d="M1.5 5.5l6.5 4 6.5-4" stroke="#7A7870" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              <span style={{ color: '#7A7870' }}>Contato</span>
+            </a>
+          </div>
+
+          {/* CTA principal no rodapé do drawer */}
+          <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(200,198,188,0.6)' }}>
+            <a
+              href="/register"
+              className="btn-primary"
+              style={{ width: '100%', justifyContent: 'center', padding: '13px', fontSize: 15 }}
+              onClick={() => setMenuOpen(false)}
+            >
+              Começar grátis
+            </a>
+          </div>
+        </div>
+      </div>
 
       {/* ── HERO ── */}
       <section style={{
