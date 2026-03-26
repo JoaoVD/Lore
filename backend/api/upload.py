@@ -259,18 +259,21 @@ async def get_file_status(
 ) -> StatusResponse:
 
     # Busca o documento
-    doc_result = (
-        supabase.table("documents")
-        .select("id, status, chunks_count, error_message, file_name")
-        .eq("id", file_id)
-        .eq("project_id", project_id)
-        .single()
-        .execute()
-    )
+    try:
+        doc_result = (
+            supabase.table("documents")
+            .select("id, status, chunks_count, error_message, file_name")
+            .eq("id", file_id)
+            .eq("project_id", project_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(status_code=500, detail="Erro ao consultar o banco de dados")
     if not doc_result.data:
         raise HTTPException(status_code=404, detail="Documento não encontrado")
 
-    doc = doc_result.data
+    doc = doc_result.data[0]
     return StatusResponse(
         document_id=doc["id"],
         status=doc.get("status", "processing"),

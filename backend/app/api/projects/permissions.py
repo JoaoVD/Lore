@@ -55,20 +55,26 @@ def require_project_access(required_role: str):
         supabase: Client = Depends(get_supabase),
     ) -> ProjectAccess:
         # 1. Verifica se o projeto existe
-        proj_result = (
-            supabase.table("projects")
-            .select("*")
-            .eq("id", project_id)
-            .single()
-            .execute()
-        )
+        try:
+            proj_result = (
+                supabase.table("projects")
+                .select("*")
+                .eq("id", project_id)
+                .limit(1)
+                .execute()
+            )
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Erro ao consultar o banco de dados",
+            )
         if not proj_result.data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Projeto não encontrado",
             )
 
-        project = proj_result.data
+        project = proj_result.data[0]
 
         # 2. Verifica role na tabela project_members
         member_result = (

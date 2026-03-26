@@ -252,5 +252,5 @@ def ingest_document(
         status="success",
         chunks=len(nodes),
         collection=collection,
-        file_name=file_path.name,
+        file_name=display_name,
     )
