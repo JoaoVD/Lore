@@ -446,7 +446,6 @@ async def google_drive_auth(
     state = _encode_state(user.id, project_id, code_verifier)
     auth_url, _ = flow.authorization_url(
         access_type="offline",
-        include_granted_scopes="true",
         prompt="consent",
         state=state,
         code_challenge=code_challenge,
