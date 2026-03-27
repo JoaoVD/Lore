@@ -135,11 +135,11 @@ async def create_project(
     project = result.data[0]
 
     # Registra o criador como owner em project_members
-    supabase.table("project_members").insert({
+    supabase.table("project_members").upsert({
         "project_id": project["id"],
         "user_id": user.id,
         "role": "owner",
-    }).execute()
+    }, on_conflict="project_id,user_id").execute()
 
     log_usage(user.id, "project_create")
     return project
