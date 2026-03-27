@@ -19,6 +19,10 @@ CREATE TABLE IF NOT EXISTS public.integrations (
 CREATE INDEX IF NOT EXISTS idx_integrations_user_provider
     ON public.integrations (user_id, provider);
 
+-- Garante updated_at mesmo se a tabela já existia sem a coluna
+ALTER TABLE public.integrations
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
 
 -- 2. Tabela de vinculação de pastas/fontes a projetos
 --    Um projeto pode ter no máximo uma integração por provedor.
