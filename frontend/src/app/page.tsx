@@ -248,7 +248,7 @@ export default function HomePage() {
                 },
               ].map(({ quote, name, role, initial }) => (
                 <div key={name} className="bg-white rounded-2xl p-7 border border-stone/30 shadow-sm flex flex-col gap-4">
-                  <p className="text-ink/70 text-sm leading-relaxed flex-1">"{quote}"</p>
+                  <p className="text-ink/70 text-sm leading-relaxed flex-1">&ldquo;{quote}&rdquo;</p>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-brand-light text-brand font-bold text-sm flex items-center justify-center flex-shrink-0">
                       {initial}
