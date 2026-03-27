@@ -222,7 +222,6 @@ def _get_credentials(user_id: str, supabase: Client) -> Credentials:
             supabase.table("integrations").update({
                 "access_token": creds.token,
                 "expires_at": creds.expiry.isoformat() if creds.expiry else None,
-                "updated_at": datetime.utcnow().isoformat(),
             }).eq("user_id", user_id).eq("provider", "google_drive").execute()
         except Exception as exc:
             raise HTTPException(
@@ -510,7 +509,6 @@ async def google_drive_callback(
         "access_token":  creds.token,
         "refresh_token": creds.refresh_token,
         "expires_at":    expires_at,
-        "updated_at":    datetime.utcnow().isoformat(),
     }, on_conflict="user_id,provider").execute()
 
     logger.info("[gdrive callback] Tokens salvos | user=%s project=%s", user_id, project_id)

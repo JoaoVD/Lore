@@ -531,9 +531,15 @@ function IntegrationsSection({
     const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
     fetch(`${apiBase}/api/integrations/google-drive/folders`, {
       headers: { Authorization: `Bearer ${token}` }
-    }).then(r => r.json())
+    }).then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}))
+          throw new Error(body.detail ?? `Erro ${r.status} ao listar pastas`)
+        }
+        return r.json()
+      })
       .then(setFolders)
-      .catch(() => {})
+      .catch((err) => toast(err instanceof Error ? err.message : 'Erro ao carregar pastas do Drive.', 'error'))
       .finally(() => setLoadingFolders(false))
   }, [integration?.connected]) // eslint-disable-line react-hooks/exhaustive-deps
 
