@@ -144,7 +144,7 @@ const CATEGORIES: Category[] = [
         answer: (
           <div className="flex flex-col gap-2">
             <p className="text-sm text-ink/80 leading-relaxed">
-              Projetos são espaços separados — pense em cada projeto como uma "base de conhecimento" independente. Você pode ter um projeto para cada cliente, departamento ou produto.
+              Projetos são espaços separados — pense em cada projeto como uma &ldquo;base de conhecimento&rdquo; independente. Você pode ter um projeto para cada cliente, departamento ou produto.
             </p>
             <Steps items={[
               'No painel principal (<strong>Dashboard</strong>), clique em <strong>"Novo projeto"</strong>.',
@@ -249,7 +249,7 @@ const CATEGORIES: Category[] = [
               'O Lore vai verificar quais arquivos são novos e importar apenas eles.',
               'Arquivos já importados anteriormente não são duplicados.',
             ]} />
-            <Note>A sincronização não é automática — você precisa clicar em "Sincronizar agora" cada vez que adicionar novos arquivos à pasta do Drive.</Note>
+            <Note>A sincronização não é automática — você precisa clicar em &ldquo;Sincronizar agora&rdquo; cada vez que adicionar novos arquivos à pasta do Drive.</Note>
           </div>
         ),
       },
@@ -821,7 +821,7 @@ export default function AjudaPage() {
                   <p className="text-4xl mb-4">🔍</p>
                   <p className="text-base font-semibold text-ink mb-2">Nenhum artigo encontrado</p>
                   <p className="text-sm text-ink/60 mb-6">
-                    Não encontramos resultados para <strong>"{search}"</strong>.
+                    Não encontramos resultados para <strong>&ldquo;{search}&rdquo;</strong>.
                   </p>
                   <a
                     href="mailto:suporte@uselore.com.br"
