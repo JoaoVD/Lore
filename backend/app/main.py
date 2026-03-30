@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.upload import router as upload_router
+from app.api.integrations.api_rest import router as api_rest_router
 from app.api.integrations.google_drive import (
     integrations_router,
     project_integrations_router,
@@ -40,6 +41,9 @@ app.include_router(integrations_router, prefix="/api/integrations", tags=["integ
 
 # Google Drive — rotas específicas de projeto (vinculação + sync)
 app.include_router(project_integrations_router, prefix="/api/projects", tags=["integrations"])
+
+# Integração com API REST externa (estoque/preço)
+app.include_router(api_rest_router, prefix="/api/projects", tags=["integrations"])
 
 
 @app.get("/health", tags=["infra"])

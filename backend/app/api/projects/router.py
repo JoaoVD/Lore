@@ -46,6 +46,7 @@ from app.services.limits_service import (
 )
 from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchValue
+from app.api.integrations.api_rest import query_api_for_products
 from rag.query import query_documents
 
 router = APIRouter()
@@ -323,6 +324,9 @@ async def chat(
     )
     chat_history = list(reversed(history_result.data or []))
 
+    # Consulta API externa de estoque (se configurada para o projeto)
+    api_context = await query_api_for_products(project_id, body.message, supabase)
+
     # Chama o RAG em thread para não bloquear o event loop
     # tenant_id é sempre o owner do projeto para garantir acesso à collection correta
     rag_result = await asyncio.to_thread(
@@ -331,6 +335,7 @@ async def chat(
         tenant_id=access.owner_id,
         project_id=project_id,
         chat_history=chat_history,
+        api_context=api_context,
     )
 
     if rag_result.status != "success":

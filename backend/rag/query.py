@@ -56,6 +56,18 @@ SYSTEM_PROMPT = (
   6. Responda em português brasileiro. """
 )
 
+SYSTEM_PROMPT_WITH_STOCK = (
+"""Você é um assistente especializado nos documentos e no sistema de estoque desta empresa.
+  REGRAS OBRIGATÓRIAS — siga sem exceção:
+  1. Responda APENAS com base nas informações fornecidas no contexto (documentos internos e/ou dados de estoque).
+  2. Para consultas de estoque e preço, utilize os DADOS DO SISTEMA DE ESTOQUE — eles são sempre a fonte mais atualizada.
+  3. Se a informação NÃO estiver no contexto, responda EXATAMENTE: "Não encontrei essa informação nos documentos ou no sistema disponível."
+  4. NUNCA invente preços, quantidades ou disponibilidade de produtos.
+  5. NUNCA diga "provavelmente", "acredito que", "geralmente" ou qualquer expressão que indique suposição.
+  6. Sempre informe quantidade em estoque e preço quando esses dados estiverem disponíveis.
+  7. Responda em português brasileiro. """
+)
+
 
 # ── Data classes ──────────────────────────────────────────────────────────────
 
@@ -212,12 +224,13 @@ def _build_messages(
     question: str,
     context: str,
     chat_history: list[dict],
+    system_prompt: str = SYSTEM_PROMPT,
 ) -> list[dict]:
     """
     Assemble the full message list for the Chat Completions API:
       [system] + [prior turns] + [user message with injected context]
     """
-    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages: list[dict] = [{"role": "system", "content": system_prompt}]
 
     # Validate and include prior conversation turns
     for turn in chat_history:
@@ -242,6 +255,7 @@ def query_documents(
     tenant_id: str,
     project_id: str,
     chat_history: list[dict] | None = None,
+    api_context: str = "",
 ) -> QueryResult:
     """
     Run a RAG query against the tenant's document collection.
@@ -281,8 +295,20 @@ def query_documents(
         return QueryResult(answer="", status="error", message=msg)
 
     # ── 3. Build context + messages ──────────────────────────────────────────
-    context = _build_context_block(chunks)
-    messages = _build_messages(question, context, chat_history)
+    doc_context = _build_context_block(chunks)
+
+    # Combine document context with real-time API context (if any)
+    context_parts = []
+    if chunks:
+        context_parts.append(f"[DOCUMENTOS INTERNOS]\n{doc_context}")
+    if api_context:
+        context_parts.append(api_context)
+    if not context_parts:
+        context_parts.append("(Nenhuma informação encontrada nos documentos ou no sistema disponível.)")
+
+    context = "\n\n".join(context_parts)
+    system_prompt = SYSTEM_PROMPT_WITH_STOCK if api_context else SYSTEM_PROMPT
+    messages = _build_messages(question, context, chat_history, system_prompt)
     logger.debug("Sending %d message(s) to %s", len(messages), LLM_MODEL)
 
     # ── 4. Call OpenAI Chat Completions ──────────────────────────────────────

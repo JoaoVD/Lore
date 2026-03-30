@@ -763,6 +763,326 @@ function IntegrationsSection({
   )
 }
 
+// ── API Integration Section ───────────────────────────────────────────────────
+
+interface ApiIntegrationForm {
+  name: string
+  base_url: string
+  auth_type: string
+  auth_header: string
+  auth_value: string
+  endpoint_stock: string
+  response_path: string
+  field_name: string
+  field_price: string
+  field_stock: string
+  field_sku: string
+}
+
+const DEFAULT_FORM: ApiIntegrationForm = {
+  name: '',
+  base_url: '',
+  auth_type: 'api_key',
+  auth_header: 'Authorization',
+  auth_value: '',
+  endpoint_stock: '/produtos?nome={query}',
+  response_path: 'data',
+  field_name: 'nome',
+  field_price: 'preco',
+  field_stock: 'estoque',
+  field_sku: 'codigo',
+}
+
+function ApiIntegrationSection({
+  projectId,
+  token,
+  isOwner,
+  toast,
+}: {
+  projectId: string
+  token: string
+  isOwner: boolean
+  toast: (msg: string, type: 'success' | 'error' | 'info' | 'warning') => void
+}) {
+  const [form, setForm] = useState<ApiIntegrationForm>(DEFAULT_FORM)
+  const [hasExisting, setHasExisting] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const [testResult, setTestResult] = useState<{ success: boolean; count?: number | null; sample?: unknown[]; error?: string } | null>(null)
+
+  const set = (field: keyof ApiIntegrationForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((prev) => ({ ...prev, [field]: e.target.value }))
+
+  // Load existing config
+  useEffect(() => {
+    if (!token || !isOwner) { setLoading(false); return }
+    apiFetch<Record<string, unknown> | null>(`/${projectId}/api-integration`, token)
+      .then((data) => {
+        if (data) {
+          setHasExisting(true)
+          setForm({
+            name:           (data.name as string) ?? '',
+            base_url:       (data.base_url as string) ?? '',
+            auth_type:      (data.auth_type as string) ?? 'api_key',
+            auth_header:    (data.auth_header as string) ?? 'Authorization',
+            auth_value:     '',   // never pre-fill token
+            endpoint_stock: (data.endpoint_stock as string) ?? '',
+            response_path:  (data.response_path as string) ?? 'data',
+            field_name:     (data.field_name as string) ?? 'nome',
+            field_price:    (data.field_price as string) ?? 'preco',
+            field_stock:    (data.field_stock as string) ?? 'estoque',
+            field_sku:      (data.field_sku as string) ?? 'codigo',
+          })
+        }
+      })
+      .catch(() => {/* not found = no integration */})
+      .finally(() => setLoading(false))
+  }, [token, isOwner]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleTest() {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const result = await apiFetch<{ success: boolean; count: number | null; sample: unknown[] }>(
+        `/${projectId}/api-integration/test`,
+        token,
+        {
+          method: 'POST',
+          body: JSON.stringify({ ...form, query: 'produto' }),
+        }
+      )
+      setTestResult({ success: true, count: result.count, sample: result.sample })
+      toast(`Conexão OK — ${result.count != null ? `${result.count} itens encontrados` : 'resposta recebida'}`, 'success')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao testar conexão'
+      setTestResult({ success: false, error: msg })
+      toast(msg, 'error')
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  async function handleSave() {
+    if (!form.name.trim()) { toast('Informe o nome da integração', 'error'); return }
+    if (!form.base_url.trim()) { toast('Informe a URL base da API', 'error'); return }
+    if (!form.endpoint_stock.trim()) { toast('Informe o endpoint de busca', 'error'); return }
+    if (!hasExisting && !form.auth_value.trim()) { toast('Informe o token de autenticação', 'error'); return }
+
+    setSaving(true)
+    try {
+      await apiFetch(`/${projectId}/api-integration`, token, {
+        method: 'POST',
+        body: JSON.stringify(form),
+      })
+      setHasExisting(true)
+      setForm((prev) => ({ ...prev, auth_value: '' }))
+      toast('Integração salva com sucesso!', 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao salvar integração', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleRemove() {
+    setRemoving(true)
+    try {
+      await apiFetch(`/${projectId}/api-integration`, token, { method: 'DELETE' })
+      setHasExisting(false)
+      setForm(DEFAULT_FORM)
+      setTestResult(null)
+      toast('Integração removida.', 'info')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao remover integração', 'error')
+    } finally {
+      setRemoving(false)
+    }
+  }
+
+  if (!isOwner) {
+    return (
+      <Card padding="lg">
+        <p className="text-sm text-muted">
+          {hasExisting ? 'Integração com API externa configurada.' : 'Nenhuma integração de API configurada.'}
+        </p>
+      </Card>
+    )
+  }
+
+  if (loading) {
+    return (
+      <Card padding="lg">
+        <div className="h-10 rounded-xl bg-stone/20 animate-pulse" />
+      </Card>
+    )
+  }
+
+  const fieldClass = "w-full h-9 rounded-xl border border-stone bg-surface px-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
+
+  return (
+    <Card padding="none">
+      {/* Header */}
+      <div className="px-5 py-4 flex items-center gap-3 border-b border-stone/30">
+        <div className="h-10 w-10 rounded-xl bg-brand-light flex items-center justify-center shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-ink">API REST Externa</p>
+          <p className="text-xs text-muted mt-0.5">Consulte estoque e preço em tempo real via chat</p>
+        </div>
+        {hasExisting && (
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full shrink-0">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Ativo
+          </span>
+        )}
+      </div>
+
+      {/* Form */}
+      <div className="px-5 py-4 flex flex-col gap-4">
+
+        {/* Nome + URL base */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-ink">Nome da integração</label>
+            <input className={fieldClass} placeholder="ex: Estoque Bling" value={form.name} onChange={set('name')} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-ink">URL base da API</label>
+            <input className={fieldClass} placeholder="https://api.exemplo.com/v1" value={form.base_url} onChange={set('base_url')} />
+          </div>
+        </div>
+
+        {/* Endpoint */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-ink">Endpoint de busca</label>
+          <input className={fieldClass} placeholder="/produtos?nome={query}" value={form.endpoint_stock} onChange={set('endpoint_stock')} />
+          <p className="text-xs text-muted">Use <code className="bg-stone/20 px-1 rounded font-mono">{'{query}'}</code> onde vai o termo buscado pelo vendedor</p>
+        </div>
+
+        {/* Auth */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-ink">Tipo de auth</label>
+            <select className={fieldClass} value={form.auth_type} onChange={set('auth_type')}>
+              <option value="api_key">API Key</option>
+              <option value="bearer">Bearer Token</option>
+              <option value="basic">Basic Auth</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-ink">Header</label>
+            <input className={fieldClass} placeholder="Authorization" value={form.auth_header} onChange={set('auth_header')} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-ink">
+              Token / Chave
+              {hasExisting && <span className="ml-1 font-normal text-muted">(salvo)</span>}
+            </label>
+            <input
+              className={fieldClass}
+              type="password"
+              placeholder={hasExisting ? 'Deixe em branco para manter' : 'Bearer TOKEN ou chave'}
+              value={form.auth_value}
+              onChange={set('auth_value')}
+            />
+          </div>
+        </div>
+
+        {/* Field mapping */}
+        <div>
+          <p className="text-xs font-semibold text-ink mb-2">Mapeamento de campos do JSON de resposta</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-muted">Nome do produto</label>
+              <input className={fieldClass} placeholder="nome" value={form.field_name} onChange={set('field_name')} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-muted">Preço</label>
+              <input className={fieldClass} placeholder="preco" value={form.field_price} onChange={set('field_price')} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-muted">Estoque</label>
+              <input className={fieldClass} placeholder="estoque" value={form.field_stock} onChange={set('field_stock')} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-muted">Código / SKU</label>
+              <input className={fieldClass} placeholder="codigo" value={form.field_sku} onChange={set('field_sku')} />
+            </div>
+          </div>
+        </div>
+
+        {/* Response path */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-ink">Caminho da lista no JSON</label>
+          <input className={`${fieldClass} sm:w-48`} placeholder="data" value={form.response_path} onChange={set('response_path')} />
+          <p className="text-xs text-muted">
+            Se a API retorna <code className="bg-stone/20 px-1 rounded font-mono">{'{"data":[...]}'}</code> coloque <code className="bg-stone/20 px-1 rounded font-mono">data</code>.
+            Para sub-níveis use ponto: <code className="bg-stone/20 px-1 rounded font-mono">data.items</code>. Deixe em branco se a raiz já é um array.
+          </p>
+        </div>
+      </div>
+
+      {/* Test result */}
+      {testResult && (
+        <div className={`mx-5 mb-3 rounded-xl px-4 py-3 text-xs leading-relaxed border ${testResult.success ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+          {testResult.success ? (
+            <>
+              <p className="font-semibold mb-1">
+                Conexão OK{testResult.count != null ? ` — ${testResult.count} itens encontrados` : ''}
+              </p>
+              {Array.isArray(testResult.sample) && testResult.sample.length > 0 && (
+                <pre className="overflow-x-auto font-mono text-xs opacity-80 whitespace-pre-wrap">
+                  {JSON.stringify(testResult.sample, null, 2)}
+                </pre>
+              )}
+            </>
+          ) : (
+            <p>{testResult.error}</p>
+          )}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="px-5 py-4 border-t border-stone/30 flex flex-wrap items-center gap-2 justify-between">
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={handleTest} loading={testing}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            Testar conexão
+          </Button>
+          <Button size="sm" onClick={handleSave} loading={saving}>
+            Salvar
+          </Button>
+        </div>
+        {hasExisting && (
+          <button
+            onClick={handleRemove}
+            disabled={removing}
+            title="Remover integração"
+            className="h-9 w-9 flex items-center justify-center rounded-xl border border-stone text-muted hover:text-[#A32D2D] hover:border-[#F7C1C1] hover:bg-[#F7C1C1]/20 transition-colors disabled:opacity-40"
+          >
+            {removing ? (
+              <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>
+            )}
+          </button>
+        )}
+      </div>
+    </Card>
+  )
+}
+
 // ── Settings Page (inner — uses useSearchParams) ──────────────────────────────
 
 function SettingsPageInner() {
@@ -1026,6 +1346,23 @@ function SettingsPageInner() {
                     isOwner={isOwner}
                     toast={toast}
                     onGdriveConnected={gdriveConnected}
+                  />
+                )}
+              </Section>
+
+              <Divider />
+
+              {/* ── API Integration ── */}
+              <Section
+                title="Integração com API"
+                subtitle="Conecte qualquer API REST para consultar estoque e preços em tempo real via chat."
+              >
+                {token && (
+                  <ApiIntegrationSection
+                    projectId={projectId}
+                    token={token}
+                    isOwner={isOwner}
+                    toast={toast}
                   />
                 )}
               </Section>
