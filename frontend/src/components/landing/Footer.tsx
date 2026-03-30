@@ -31,8 +31,8 @@ export default function Footer() {
             </div>
             <div className="flex flex-col gap-3">
               <p className="text-xs uppercase tracking-widest text-white/40 font-medium">Empresa</p>
-              <Link href="/register" className="hover:text-white transition-colors duration-150">
-                Começar grátis
+              <Link href="/ajuda" className="hover:text-white transition-colors duration-150">
+                Central de Ajuda
               </Link>
               <Link href="/terms" className="hover:text-white transition-colors duration-150">
                 Termos

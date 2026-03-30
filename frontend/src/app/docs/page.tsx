@@ -118,7 +118,7 @@ export default function DocsPage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link
-                  href="/auth/signup"
+                  href="/register"
                   className="bg-brand text-white px-6 py-3 rounded-xl font-medium hover:bg-brand-dark transition-colors duration-150 text-base text-center"
                 >
                   Começar grátis →
@@ -282,7 +282,7 @@ export default function DocsPage() {
                   ))}
                 </ul>
                 <Link
-                  href="/auth/signup"
+                  href="/register"
                   className="block w-full bg-brand-light text-brand text-center px-4 py-3 rounded-xl font-medium hover:bg-brand hover:text-white transition-colors duration-150 text-sm"
                 >
                   Começar grátis
@@ -305,7 +305,7 @@ export default function DocsPage() {
                   ))}
                 </ul>
                 <Link
-                  href="/auth/signup"
+                  href="/register"
                   className="block w-full bg-white text-brand text-center px-4 py-3 rounded-xl font-medium hover:bg-brand-light transition-colors duration-150 text-sm"
                 >
                   Começar grátis
@@ -329,7 +329,7 @@ export default function DocsPage() {
                 14 dias grátis · Sem cartão de crédito
               </p>
               <Link
-                href="/auth/signup"
+                href="/register"
                 className="inline-block bg-white text-brand px-8 py-4 rounded-xl font-medium hover:bg-brand-light transition-colors duration-150 text-base"
               >
                 Começar 14 dias grátis →
