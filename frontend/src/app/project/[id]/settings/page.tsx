@@ -360,7 +360,7 @@ function MembersSection({
               <div className="h-9 w-9 rounded-full bg-brand-light flex items-center justify-center shrink-0 overflow-hidden">
                 {m.avatar_url ? (
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={m.avatar_url!} alt={m.email} className="h-9 w-9 object-cover" />
+                  <img src={m.avatar_url as string} alt={m.email} className="h-9 w-9 object-cover" />
                 ) : (
                   <span className="text-xs font-bold text-brand">{getInitials(m.email)}</span>
                 )}
