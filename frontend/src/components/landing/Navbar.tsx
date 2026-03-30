@@ -89,11 +89,11 @@ export default function Navbar() {
           <Link href="/#precos" className="hover:text-brand transition-colors duration-150">
             Preços
           </Link>
-          <Link href="/auth/login" className="hover:text-brand transition-colors duration-150">
+          <Link href="/login" className="hover:text-brand transition-colors duration-150">
             Entrar
           </Link>
           <Link
-            href="/auth/signup"
+            href="/register"
             className="bg-brand text-white px-4 py-2 rounded-lg hover:bg-brand-dark transition-colors duration-150 font-medium"
           >
             Começar grátis
@@ -148,14 +148,14 @@ export default function Navbar() {
             Preços
           </Link>
           <Link
-            href="/auth/login"
+            href="/login"
             className="px-3 py-2.5 rounded-lg hover:bg-brand-light transition-colors duration-150"
             onClick={() => setMobileOpen(false)}
           >
             Entrar
           </Link>
           <Link
-            href="/auth/signup"
+            href="/register"
             className="mt-2 bg-brand text-white px-4 py-3 rounded-lg text-center font-medium hover:bg-brand-dark transition-colors duration-150"
             onClick={() => setMobileOpen(false)}
           >

@@ -13,6 +13,8 @@ const PUBLIC_PATHS = [
   '/terms',
   '/privacy',
   '/contact',
+  '/docs',
+  '/estoq',
 ]
 
 function isPublic(pathname: string): boolean {
