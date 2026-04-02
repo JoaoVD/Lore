@@ -54,3 +54,11 @@ class Features:
     # Modo de demonstração — sem necessidade de cadastro
     # Variável: FEATURE_DEMO_MODE=true
     DEMO_MODE = flag("DEMO_MODE", default=False)
+
+    # Histórico de conversas — sessões de chat por projeto
+    # Variável: FEATURE_HISTORY=true
+    HISTORY = flag("HISTORY", default=False)
+
+    # Relatório de uso — métricas de perguntas, sessões e tempo economizado
+    # Variável: FEATURE_USAGE_REPORT=true
+    USAGE_REPORT = flag("USAGE_REPORT", default=False)

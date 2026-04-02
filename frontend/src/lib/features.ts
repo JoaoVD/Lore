@@ -31,4 +31,10 @@ export const Features = {
 
   // Modo demo — mostra banner "teste sem cadastro"
   DEMO_MODE: flag('DEMO_MODE', false),
+
+  // Histórico de conversas — painel lateral com sessões anteriores
+  HISTORY: flag('HISTORY', false),
+
+  // Relatório de uso — métricas de perguntas, sessões e tempo economizado
+  USAGE_REPORT: flag('USAGE_REPORT', false),
 } as const

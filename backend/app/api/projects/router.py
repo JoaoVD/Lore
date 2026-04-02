@@ -305,6 +305,7 @@ async def chat(
     project_id: str,
     body: ChatRequest,
     access: ProjectAccess = Depends(require_project_access("viewer")),
+    user: AuthUser = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
     """
@@ -346,11 +347,29 @@ async def chat(
 
     sources = [s.to_dict() for s in rag_result.sources]
 
-    msgs_to_insert = [
-        {"project_id": project_id, "role": "user",      "content": body.message,      "sources": []},
-        {"project_id": project_id, "role": "assistant",  "content": rag_result.answer, "sources": sources},
-    ]
-    insert_result = supabase.table("chat_messages").insert(msgs_to_insert).execute()
+    # Cria ou reutiliza sessão de chat quando HISTORY está ativo
+    session_id: str | None = body.session_id
+    if Features.HISTORY:
+        if not session_id:
+            title = body.message[:60] + ("..." if len(body.message) > 60 else "")
+            session_row = supabase.table("chat_sessions").insert({
+                "project_id": project_id,
+                "user_id":    user.id,
+                "title":      title,
+            }).execute()
+            if session_row.data:
+                session_id = session_row.data[0]["id"]
+
+    # Monta payload base dos campos obrigatórios
+    base_user = {"project_id": project_id, "role": "user",      "content": body.message,      "sources": []}
+    base_asst = {"project_id": project_id, "role": "assistant",  "content": rag_result.answer, "sources": sources}
+
+    # Adiciona session_id e user_id quando HISTORY ativo
+    if Features.HISTORY and session_id:
+        base_user.update({"session_id": session_id, "user_id": user.id})
+        base_asst.update({"session_id": session_id, "user_id": user.id})
+
+    insert_result = supabase.table("chat_messages").insert([base_user, base_asst]).execute()
     if not insert_result.data or len(insert_result.data) < 2:
         raise HTTPException(status_code=500, detail="Falha ao salvar mensagens")
 
@@ -362,6 +381,7 @@ async def chat(
         user_message=ChatMessageResponse(**user_msg),
         assistant_message=ChatMessageResponse(**assistant_msg),
         tokens=rag_result.tokens.to_dict(),
+        session_id=session_id,
     )
 
 

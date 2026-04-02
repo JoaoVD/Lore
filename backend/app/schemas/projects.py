@@ -36,6 +36,7 @@ class DocumentResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=4000)
+    session_id: str | None = None    # opcional — se None e HISTORY ativo, cria nova sessão
 
 
 class ChatMessageResponse(BaseModel):
@@ -45,12 +46,14 @@ class ChatMessageResponse(BaseModel):
     content: str
     sources: list[dict[str, Any]]    # [{file_name, page_number, score}]
     created_at: datetime
+    session_id: str | None = None    # preenchido quando FEATURE_HISTORY=true
 
 
 class ChatResponse(BaseModel):
     user_message: ChatMessageResponse
     assistant_message: ChatMessageResponse
     tokens: dict[str, int]           # {prompt, completion, total}
+    session_id: str | None = None    # retorna o session_id criado/usado
 
 
 # ── Members ───────────────────────────────────────────────────────────────────
