@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from supabase import Client
 
 from app.api.projects.permissions import ProjectAccess, require_project_access
+from app.core.features import Features
 from app.db.supabase import get_supabase
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,8 @@ async def get_api_integration(
     access: ProjectAccess = Depends(require_project_access("owner")),
     supabase: Client = Depends(get_supabase),
 ):
+    if not Features.ESTOQ:
+        raise HTTPException(status_code=404, detail="Feature não disponível")
     """Retorna a configuração da integração de API do projeto (auth_value mascarado)."""
     result = (
         supabase.table("api_integrations")
@@ -74,6 +77,8 @@ async def save_api_integration(
     supabase: Client = Depends(get_supabase),
 ):
     """Salva ou atualiza a configuração da integração de API REST externa."""
+    if not Features.ESTOQ:
+        raise HTTPException(status_code=404, detail="Feature não disponível")
     # Se auth_value não fornecido, mantém o existente
     auth_value = data.auth_value
     if not auth_value:

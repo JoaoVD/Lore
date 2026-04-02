@@ -47,6 +47,7 @@ from app.services.limits_service import (
 from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchValue
 from app.api.integrations.api_rest import query_api_for_products
+from app.core.features import Features
 from rag.query import query_documents
 
 router = APIRouter()
@@ -324,8 +325,10 @@ async def chat(
     )
     chat_history = list(reversed(history_result.data or []))
 
-    # Consulta API externa de estoque (se configurada para o projeto)
-    api_context = await query_api_for_products(project_id, body.message, supabase)
+    # Consulta API externa de estoque — apenas se Lore Estoq estiver ativo
+    api_context = ""
+    if Features.ESTOQ:
+        api_context = await query_api_for_products(project_id, body.message, supabase)
 
     # Chama o RAG em thread para não bloquear o event loop
     # tenant_id é sempre o owner do projeto para garantir acesso à collection correta

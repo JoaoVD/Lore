@@ -7,6 +7,7 @@ from app.api.integrations.google_drive import (
     integrations_router,
     project_integrations_router,
 )
+from app.api.admin.router import router as admin_router
 from app.api.projects.router import router as projects_router
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -44,6 +45,9 @@ app.include_router(project_integrations_router, prefix="/api/projects", tags=["i
 
 # Integração com API REST externa (estoque/preço)
 app.include_router(api_rest_router, prefix="/api/projects", tags=["integrations"])
+
+# Admin — feature flags e debug
+app.include_router(admin_router)
 
 
 @app.get("/health", tags=["infra"])
