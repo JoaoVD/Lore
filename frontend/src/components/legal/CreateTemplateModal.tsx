@@ -13,7 +13,7 @@ interface Props {
   token: string
   categories: Category[]
   onClose: () => void
-  onSuccess: (template: any) => void
+  onSuccess: (template: Record<string, unknown>) => void
 }
 
 export function CreateTemplateModal({ projectId, token, categories, onClose, onSuccess }: Props) {

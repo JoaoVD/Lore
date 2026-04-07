@@ -134,7 +134,7 @@ function CheckIcon() {
 
 type Plan = (typeof PLANS)['monthly'][number] | (typeof PLANS)['annual'][number]
 
-function PlanCard({ plan, cycle: _cycle }: { plan: Plan; cycle: BillingCycle }) {
+function PlanCard({ plan }: { plan: Plan; cycle: BillingCycle }) {
   const [loading, setLoading] = useState(false)
   const annualPlan = plan as (typeof PLANS)['annual'][number]
   const equivalent = 'equivalent' in annualPlan ? annualPlan.equivalent : undefined

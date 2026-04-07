@@ -106,21 +106,6 @@ export default function UsagePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // Gate de feature
-  if (!Features.USAGE_REPORT) {
-    return (
-      <div className="min-h-screen bg-parchment flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-ink font-semibold">Relatório de uso não disponível</p>
-          <p className="text-muted text-sm mt-1">Esta feature ainda não foi ativada.</p>
-          <Link href={`/dashboard`} className="mt-4 inline-block text-sm text-brand hover:underline">
-            Voltar ao dashboard
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
   const load = useCallback(async (tk: string, p: string) => {
     setLoading(true)
     setError('')
@@ -135,12 +120,28 @@ export default function UsagePage() {
   }, [projectId])
 
   useEffect(() => {
+    if (!Features.USAGE_REPORT) return
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) { router.replace('/login'); return }
       setToken(session.access_token)
       load(session.access_token, period)
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Gate de feature
+  if (!Features.USAGE_REPORT) {
+    return (
+      <div className="min-h-screen bg-parchment flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-ink font-semibold">Relatório de uso não disponível</p>
+          <p className="text-muted text-sm mt-1">Esta feature ainda não foi ativada.</p>
+          <Link href={`/dashboard`} className="mt-4 inline-block text-sm text-brand hover:underline">
+            Voltar ao dashboard
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   function changePeriod(p: string) {
     setPeriod(p)

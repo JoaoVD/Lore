@@ -339,8 +339,8 @@ export default function LegalPage() {
     setGeneratedDoc(doc)
   }, [])
 
-  const handleTemplateCreated = useCallback((template: Template) => {
-    setTemplates((prev) => [template, ...prev])
+  const handleTemplateCreated = useCallback((template: Record<string, unknown>) => {
+    setTemplates((prev) => [template as unknown as Template, ...prev])
     toast('Template criado com sucesso!', 'success')
   }, [toast])
 
