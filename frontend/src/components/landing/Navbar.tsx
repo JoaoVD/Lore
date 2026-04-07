@@ -83,6 +83,14 @@ export default function Navbar() {
                 <span className="text-base">📦</span>
                 <span>Lore Estoq</span>
               </Link>
+              <Link
+                href="/juridico"
+                className="flex items-center gap-2 px-4 py-3 hover:bg-brand-light transition-colors duration-150 text-ink border-t border-stone/30"
+                onClick={() => setProdutosOpen(false)}
+              >
+                <span className="text-base">⚖️</span>
+                <span>Lore Jurídico</span>
+              </Link>
             </div>
           </div>
 
@@ -141,6 +149,13 @@ export default function Navbar() {
             onClick={() => setMobileOpen(false)}
           >
             <span>📦</span> Lore Estoq
+          </Link>
+          <Link
+            href="/juridico"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-brand-light transition-colors duration-150"
+            onClick={() => setMobileOpen(false)}
+          >
+            <span>⚖️</span> Lore Jurídico
           </Link>
           <div className="border-t border-stone/30 my-2" />
           <Link

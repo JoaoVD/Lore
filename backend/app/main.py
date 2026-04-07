@@ -10,6 +10,7 @@ from app.api.integrations.google_drive import (
 from app.api.admin.router import router as admin_router
 from app.api.history.router import router as history_router
 from app.api.legal.router import router as legal_router
+from app.api.legal.deadlines import router as deadlines_router
 from app.api.projects.router import router as projects_router
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -54,8 +55,9 @@ app.include_router(admin_router)
 # Histórico de conversas e relatório de uso
 app.include_router(history_router)
 
-# Lore Jurídico — templates e documentos jurídicos
+# Lore Jurídico — templates, documentos e prazos processuais
 app.include_router(legal_router)
+app.include_router(deadlines_router)
 
 
 @app.get("/health", tags=["infra"])

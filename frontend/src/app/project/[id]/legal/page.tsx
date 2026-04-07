@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ToastContainer, useToast } from '@/components/ui/Toast'
 import LoreLogo from '@/components/LoreLogo'
 import { CreateTemplateModal } from '@/components/legal/CreateTemplateModal'
+import { DeadlinesTab } from '@/components/legal/DeadlinesTab'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -287,7 +288,7 @@ export default function LegalPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [documents, setDocuments] = useState<GeneratedDocument[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'templates' | 'documents'>('templates')
+  const [activeTab, setActiveTab] = useState<'templates' | 'documents' | 'deadlines'>('templates')
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [generatedDoc, setGeneratedDoc] = useState<GeneratedDocument | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -398,7 +399,7 @@ export default function LegalPage() {
           {/* Tabs + search */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-8">
             <div className="flex gap-1 bg-stone/20 rounded-xl p-1">
-              {(['templates', 'documents'] as const).map((tab) => (
+              {(['templates', 'documents', 'deadlines'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -406,7 +407,11 @@ export default function LegalPage() {
                     activeTab === tab ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'
                   }`}
                 >
-                  {tab === 'templates' ? `Templates (${templates.length})` : `Gerados (${documents.length})`}
+                  {tab === 'templates'
+                    ? `Templates (${templates.length})`
+                    : tab === 'documents'
+                    ? `Gerados (${documents.length})`
+                    : '⏰ Prazos'}
                 </button>
               ))}
             </div>
@@ -509,6 +514,11 @@ export default function LegalPage() {
                 ))}
               </div>
             )
+          )}
+
+          {/* Deadlines tab */}
+          {activeTab === 'deadlines' && token && (
+            <DeadlinesTab projectId={projectId} token={token} apiBase={API_BASE} />
           )}
         </main>
       </div>
