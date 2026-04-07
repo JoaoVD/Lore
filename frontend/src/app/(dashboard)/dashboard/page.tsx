@@ -523,6 +523,7 @@ export default function DashboardPage() {
                   <DocsProjectCard
                     key={p.id}
                     project={p}
+                    onDelete={(id) => setDeleteTarget(projects.find((proj) => proj.id === id) ?? null)}
                   />
                 )}
               />
@@ -537,7 +538,11 @@ export default function DashboardPage() {
                   newLabel="Nova integração Estoq"
                   onNew={() => openNew('estoq')}
                   renderCard={(p) => (
-                    <EstoqProjectCard key={p.id} project={p} />
+                    <EstoqProjectCard
+                      key={p.id}
+                      project={p}
+                      onDelete={(id) => setDeleteTarget(projects.find((proj) => proj.id === id) ?? null)}
+                    />
                   )}
                 />
               )}
@@ -552,7 +557,11 @@ export default function DashboardPage() {
                   newLabel="Novo projeto Jurídico"
                   onNew={() => openNew('juridico')}
                   renderCard={(p) => (
-                    <LegalProjectCard key={p.id} project={p} />
+                    <LegalProjectCard
+                      key={p.id}
+                      project={p}
+                      onDelete={(id) => setDeleteTarget(projects.find((proj) => proj.id === id) ?? null)}
+                    />
                   )}
                 />
               )}

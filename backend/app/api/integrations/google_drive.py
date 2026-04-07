@@ -199,11 +199,18 @@ def _get_credentials(user_id: str, supabase: Client) -> Credentials:
         )
 
     data = row.data[0]
-    expiry = (
-        datetime.fromisoformat(data["expires_at"]).replace(tzinfo=timezone.utc)
-        if data.get("expires_at")
-        else None
-    )
+    # google-auth compara creds.expiry com datetime.utcnow() (naive),
+    # por isso precisamos de um datetime naive em UTC
+    raw_expiry = data.get("expires_at")
+    if raw_expiry:
+        dt = datetime.fromisoformat(raw_expiry.replace("Z", "+00:00"))
+        # se vier com timezone, converte para naive UTC
+        if dt.tzinfo is not None:
+            from datetime import timezone as _tz
+            dt = dt.astimezone(_tz.utc).replace(tzinfo=None)
+        expiry = dt
+    else:
+        expiry = None
 
     creds = Credentials(
         token=data["access_token"],
