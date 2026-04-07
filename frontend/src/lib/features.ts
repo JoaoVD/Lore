@@ -37,4 +37,7 @@ export const Features = {
 
   // Relatório de uso — métricas de perguntas, sessões e tempo economizado
   USAGE_REPORT: flag('USAGE_REPORT', false),
+
+  // Lore Jurídico — templates jurídicos pré-configurados para escritórios
+  JURIDICO: flag('JURIDICO', false),
 } as const

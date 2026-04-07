@@ -62,3 +62,7 @@ class Features:
     # Relatório de uso — métricas de perguntas, sessões e tempo economizado
     # Variável: FEATURE_USAGE_REPORT=true
     USAGE_REPORT = flag("USAGE_REPORT", default=False)
+
+    # Lore Jurídico — templates jurídicos pré-configurados para escritórios
+    # Variável: FEATURE_JURIDICO=true
+    JURIDICO = flag("JURIDICO", default=False)

@@ -66,9 +66,9 @@ export default function HomePage() {
             <span className="text-brand">O Lore responde.</span>
           </h1>
           <p className="text-lg sm:text-xl text-ink/70 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Dois produtos. Uma plataforma. Zero tempo perdido procurando informação.
+            Três produtos. Uma plataforma. Zero tempo perdido procurando informação.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center flex-wrap">
             <Link
               href="/docs"
               className="bg-brand text-white px-6 py-3 rounded-xl font-medium hover:bg-brand-dark transition-colors duration-150 text-base"
@@ -81,6 +81,12 @@ export default function HomePage() {
             >
               Conhecer Lore Estoq →
             </Link>
+            <Link
+              href="/juridico"
+              className="bg-white text-brand border border-brand/30 px-6 py-3 rounded-xl font-medium hover:bg-brand-light transition-colors duration-150 text-base"
+            >
+              Conhecer Lore Jurídico →
+            </Link>
           </div>
         </section>
 
@@ -91,12 +97,12 @@ export default function HomePage() {
               className="text-3xl sm:text-4xl font-bold text-center text-ink mb-4"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
-              Dois produtos, um problema
+              Três produtos, um problema
             </h2>
             <p className="text-center text-ink/60 mb-12 max-w-xl mx-auto">
               Informação espalhada custa tempo e dinheiro. O Lore centraliza tudo.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white rounded-2xl p-8 border border-stone/30 shadow-sm hover:shadow-md transition-shadow duration-200">
                 <div className="text-4xl mb-4">📄</div>
                 <div className="inline-block bg-brand-light text-brand text-xs font-semibold px-2.5 py-1 rounded-full mb-3 uppercase tracking-wide">
@@ -142,6 +148,30 @@ export default function HomePage() {
                 </ul>
                 <Link href="/estoq" className="text-brand font-medium text-sm hover:text-brand-dark transition-colors duration-150">
                   Ver Lore Estoq →
+                </Link>
+              </div>
+
+              <div className="bg-white rounded-2xl p-8 border border-stone/30 shadow-sm hover:shadow-md transition-shadow duration-200">
+                <div className="text-4xl mb-4">⚖️</div>
+                <div className="inline-block bg-brand-light text-brand text-xs font-semibold px-2.5 py-1 rounded-full mb-3 uppercase tracking-wide">
+                  Para escritórios de advocacia
+                </div>
+                <h3 className="text-xl font-bold text-ink mb-3" style={{ fontFamily: 'var(--font-serif)' }}>
+                  Lore Jurídico
+                </h3>
+                <p className="text-ink/70 text-sm mb-4 leading-relaxed">
+                  Templates prontos de petições, contratos e procurações. Preencha as variáveis e gere o documento em segundos — com sugestão de cláusulas por IA.
+                </p>
+                <ul className="text-sm text-ink/70 space-y-2 mb-6">
+                  {['Petições trabalhistas', 'Contratos de honorários', 'Procurações', 'Notificações extrajudiciais'].map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="text-brand-mid mt-0.5">✓</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/juridico" className="text-brand font-medium text-sm hover:text-brand-dark transition-colors duration-150">
+                  Ver Lore Jurídico →
                 </Link>
               </div>
             </div>
@@ -277,7 +307,7 @@ export default function HomePage() {
               <p className="text-white/70 mb-10 text-lg">
                 14 dias grátis · Sem cartão de crédito
               </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <div className="flex flex-col sm:flex-row gap-3 justify-center flex-wrap">
                 <Link
                   href="/docs"
                   className="bg-white text-brand px-6 py-3 rounded-xl font-medium hover:bg-brand-light transition-colors duration-150 text-base"
@@ -289,6 +319,12 @@ export default function HomePage() {
                   className="bg-white/10 text-white border border-white/30 px-6 py-3 rounded-xl font-medium hover:bg-white/20 transition-colors duration-150 text-base"
                 >
                   Começar com Lore Estoq
+                </Link>
+                <Link
+                  href="/juridico"
+                  className="bg-white/10 text-white border border-white/30 px-6 py-3 rounded-xl font-medium hover:bg-white/20 transition-colors duration-150 text-base"
+                >
+                  Começar com Lore Jurídico
                 </Link>
               </div>
             </RevealSection>
