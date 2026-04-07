@@ -354,13 +354,16 @@ async def delete_project(
             pass  # Não bloqueia a deleção se storage falhar
 
     # 2. Remove vetores do Qdrant filtrados pelo project_id
-    collection = f"tenant_{owner_id}"
-    _delete_qdrant_points(
-        collection=collection,
-        extra_filter=Filter(
-            must=[FieldCondition(key="project_id", match=MatchValue(value=project_id))]
-        ),
-    )
+    try:
+        collection = f"tenant_{owner_id}"
+        _delete_qdrant_points(
+            collection=collection,
+            extra_filter=Filter(
+                must=[FieldCondition(key="project_id", match=MatchValue(value=project_id))]
+            ),
+        )
+    except Exception:
+        pass  # Qdrant indisponível não bloqueia a deleção
 
     # 3. Deleta registros do banco (project_members em cascata via FK ou explicitamente)
     supabase.table("project_members").delete().eq("project_id", project_id).execute()
@@ -422,16 +425,19 @@ async def delete_file(
         pass
 
     # 2. Remove vetores do Qdrant filtrados por file_name + project_id
-    collection = f"tenant_{owner_id}"
-    _delete_qdrant_points(
-        collection=collection,
-        extra_filter=Filter(
-            must=[
-                FieldCondition(key="project_id", match=MatchValue(value=project_id)),
-                FieldCondition(key="file_name",  match=MatchValue(value=file_name)),
-            ]
-        ),
-    )
+    try:
+        collection = f"tenant_{owner_id}"
+        _delete_qdrant_points(
+            collection=collection,
+            extra_filter=Filter(
+                must=[
+                    FieldCondition(key="project_id", match=MatchValue(value=project_id)),
+                    FieldCondition(key="file_name",  match=MatchValue(value=file_name)),
+                ]
+            ),
+        )
+    except Exception:
+        pass  # Qdrant indisponível não bloqueia a deleção
 
     # 3. Remove do banco
     supabase.table("documents").delete().eq("id", file_id).execute()
