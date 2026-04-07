@@ -109,6 +109,33 @@ function NewProjectModal({
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
+  const PRODUCTS = [
+    {
+      id: 'docs' as const,
+      name: 'Lore Docs',
+      icon: '📄',
+      description: 'Documentos internos consultáveis via chat',
+      color: '#0F6E56',
+      bgColor: '#E1F5EE',
+    },
+    {
+      id: 'estoq' as const,
+      name: 'Lore Estoq',
+      icon: '📦',
+      description: 'Estoque e preços em linguagem natural',
+      color: '#1E3A5F',
+      bgColor: '#E8EFF7',
+    },
+    {
+      id: 'juridico' as const,
+      name: 'Lore Jurídico',
+      icon: '⚖️',
+      description: 'Templates jurídicos, prazos e documentos',
+      color: '#5B21B6',
+      bgColor: '#EDE9FE',
+    },
+  ]
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const e2: typeof errors = {}
@@ -130,19 +157,13 @@ function NewProjectModal({
     }
   }
 
-  const TYPE_LABELS: Record<string, string> = {
-    docs: '📄 Lore Docs',
-    estoq: '📦 Lore Estoq',
-    juridico: '⚖️ Lore Jurídico',
-  }
-
   if (!open) return null
 
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div role="dialog" aria-modal aria-label="Novo projeto" className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-[440px] bg-surface rounded-2xl shadow-2xl border border-stone/50 animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="w-full max-w-[460px] bg-surface rounded-2xl shadow-2xl border border-stone/50 animate-in fade-in slide-in-from-bottom-4 duration-200">
           <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-stone/30">
             <div>
               <h2 className="text-lg font-bold text-ink">Novo projeto</h2>
@@ -156,22 +177,43 @@ function NewProjectModal({
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
-            {/* Type selector */}
-            <div className="flex flex-col gap-1.5">
+            {/* Product selector — always shows all 3 */}
+            <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-ink/70">Produto</label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['docs', ...(Features.ESTOQ ? ['estoq' as const] : []), ...(Features.JURIDICO ? ['juridico' as const] : [])] as const).map((t) => (
+              <div className="flex flex-col gap-2">
+                {PRODUCTS.map((product) => (
                   <button
-                    key={t}
+                    key={product.id}
                     type="button"
-                    onClick={() => setType(t)}
-                    className={`py-2 px-1 text-xs font-medium rounded-xl border transition-colors ${
-                      type === t
-                        ? 'bg-brand text-white border-brand'
-                        : 'bg-white text-ink/60 border-stone/40 hover:border-brand/40'
+                    onClick={() => setType(product.id)}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
+                      type === product.id
+                        ? 'shadow-sm'
+                        : 'border-stone/30 hover:border-stone/50 bg-white'
                     }`}
+                    style={type === product.id ? {
+                      borderColor: product.color,
+                      backgroundColor: product.bgColor,
+                    } : {}}
                   >
-                    {TYPE_LABELS[t]}
+                    <div
+                      className="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0"
+                      style={{ backgroundColor: product.bgColor }}
+                    >
+                      {product.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-ink">{product.name}</p>
+                      <p className="text-xs text-ink/50">{product.description}</p>
+                    </div>
+                    {type === product.id && (
+                      <div
+                        className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs shrink-0"
+                        style={{ backgroundColor: product.color }}
+                      >
+                        ✓
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -346,7 +388,15 @@ export default function DashboardPage() {
     const dp: DashboardProject = { ...project, document_count: 0 }
     setProjects((prev) => [dp, ...prev])
     setMetrics((m) => ({ ...m, total_projects: m.total_projects + 1 }))
-    toast(`Projeto "${project.name}" criado com sucesso!`, 'success')
+    toast(`Projeto "${project.name}" criado!`, 'success')
+    // Redirect to the correct page for the project type
+    setTimeout(() => {
+      if (project.type === 'juridico') {
+        router.push(`/project/${project.id}/legal`)
+      } else {
+        router.push(`/dashboard/${slugify(project.name)}--${project.id}`)
+      }
+    }, 600)
   }
 
   async function handleDeleteConfirm() {
