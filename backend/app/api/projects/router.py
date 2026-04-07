@@ -130,11 +130,24 @@ async def create_project(
     if body.type:
         insert_data["type"] = body.type
 
-    result = (
-        supabase.table("projects")
-        .insert(insert_data)
-        .execute()
-    )
+    try:
+        result = (
+            supabase.table("projects")
+            .insert(insert_data)
+            .execute()
+        )
+    except Exception as e:
+        # Coluna 'type' ainda não existe no banco — retry sem ela
+        if "type" in str(e) and "PGRST204" in str(e):
+            insert_data.pop("type", None)
+            result = (
+                supabase.table("projects")
+                .insert(insert_data)
+                .execute()
+            )
+        else:
+            raise
+
     if not result.data:
         raise HTTPException(status_code=500, detail="Falha ao criar projeto")
 
