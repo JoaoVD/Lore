@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { ToastContainer, useToast } from '@/components/ui/Toast'
 import LoreLogo from '@/components/LoreLogo'
+import { CreateTemplateModal } from '@/components/legal/CreateTemplateModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -22,7 +23,8 @@ interface Template {
   content: string
   variables: Variable[]
   is_default: boolean
-  legal_template_categories: { name: string; icon: string } | null
+  category_id?: string
+  legal_template_categories: { id?: string; name: string; icon: string } | null
 }
 
 interface GeneratedDocument {
@@ -289,6 +291,19 @@ export default function LegalPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [generatedDoc, setGeneratedDoc] = useState<GeneratedDocument | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showCreateTemplate, setShowCreateTemplate] = useState(false)
+
+  const categories = useMemo(() => {
+    const seen = new Set<string>()
+    return templates
+      .filter((t) => t.legal_template_categories?.name)
+      .map((t) => ({
+        id: t.category_id ?? t.legal_template_categories?.id ?? t.legal_template_categories!.name,
+        name: t.legal_template_categories!.name,
+        icon: t.legal_template_categories!.icon,
+      }))
+      .filter((c) => !seen.has(c.id) && seen.add(c.id))
+  }, [templates])
 
   useEffect(() => {
     async function init() {
@@ -323,6 +338,11 @@ export default function LegalPage() {
     setSelectedTemplate(null)
     setGeneratedDoc(doc)
   }, [])
+
+  const handleTemplateCreated = useCallback((template: Template) => {
+    setTemplates((prev) => [template, ...prev])
+    toast('Template criado com sucesso!', 'success')
+  }, [toast])
 
   const filteredTemplates = templates.filter((t) =>
     t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -391,17 +411,28 @@ export default function LegalPage() {
               ))}
             </div>
             {activeTab === 'templates' && (
-              <div className="flex items-center gap-2 border border-stone/40 rounded-xl px-3 py-2 bg-white sm:ml-auto">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C8C6BC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Buscar templates..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="text-sm text-ink placeholder:text-ink/30 bg-transparent outline-none w-48"
-                />
+              <div className="flex items-center gap-3 sm:ml-auto">
+                <div className="flex items-center gap-2 border border-stone/40 rounded-xl px-3 py-2 bg-white">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C8C6BC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Buscar templates..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="text-sm text-ink placeholder:text-ink/30 bg-transparent outline-none w-48"
+                  />
+                </div>
+                <button
+                  onClick={() => setShowCreateTemplate(true)}
+                  className="flex items-center gap-1.5 text-sm font-semibold text-white bg-brand px-4 py-2 rounded-xl hover:bg-brand-dark transition-colors shrink-0"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  Novo template
+                </button>
               </div>
             )}
           </div>
@@ -498,6 +529,17 @@ export default function LegalPage() {
         <DocumentResultModal
           doc={generatedDoc}
           onClose={() => setGeneratedDoc(null)}
+        />
+      )}
+
+      {/* Create template modal */}
+      {showCreateTemplate && token && (
+        <CreateTemplateModal
+          projectId={projectId}
+          token={token}
+          categories={categories}
+          onClose={() => setShowCreateTemplate(false)}
+          onSuccess={handleTemplateCreated}
         />
       )}
 
