@@ -122,13 +122,17 @@ async def create_project(
     """Cria um novo projeto e define o criador como owner em project_members."""
     check_project_limit(user.id)
 
+    insert_data: dict = {
+        "user_id": user.id,
+        "name": body.name,
+        "description": body.description,
+    }
+    if body.type:
+        insert_data["type"] = body.type
+
     result = (
         supabase.table("projects")
-        .insert({
-            "user_id": user.id,
-            "name": body.name,
-            "description": body.description,
-        })
+        .insert(insert_data)
         .execute()
     )
     if not result.data:
@@ -186,6 +190,128 @@ async def list_projects(
         .execute()
     )
     return result.data or []
+
+
+@router.get("/dashboard")
+async def get_dashboard(
+    user: AuthUser = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """
+    Retorna todos os projetos do usuário com métricas resumidas para a dashboard.
+    Plataforma: GET /api/projects/dashboard
+    """
+    from datetime import date, timedelta
+
+    member_rows = (
+        supabase.table("project_members")
+        .select("project_id")
+        .eq("user_id", user.id)
+        .execute()
+    )
+    member_ids = {r["project_id"] for r in (member_rows.data or [])}
+    owned_rows = (
+        supabase.table("projects")
+        .select("id")
+        .eq("user_id", user.id)
+        .execute()
+    )
+    owned_ids = {r["id"] for r in (owned_rows.data or [])}
+    all_ids = list(member_ids | owned_ids)
+
+    if not all_ids:
+        return {"projects": [], "metrics": {"total_projects": 0, "urgent_deadlines": 0, "active_today": 0}}
+
+    projects_result = (
+        supabase.table("projects")
+        .select("*")
+        .in_("id", all_ids)
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    today = date.today()
+    dashboard_projects = []
+
+    for p in (projects_result.data or []):
+        project_data = {
+            **p,
+            "document_count": 0,
+            "question_count": 0,
+            "api_connected": False,
+            "api_name": None,
+            "urgent_deadlines": 0,
+            "template_count": 0,
+            "deadline_count": 0,
+        }
+
+        # Doc count
+        try:
+            docs = supabase.table("documents").select("id", count="exact").eq("project_id", p["id"]).execute()
+            project_data["document_count"] = docs.count or 0
+        except Exception:
+            pass
+
+        # Estoq API integration
+        if Features.ESTOQ:
+            try:
+                api = (
+                    supabase.table("api_integrations")
+                    .select("id, name")
+                    .eq("project_id", p["id"])
+                    .eq("is_active", True)
+                    .execute()
+                )
+                if api.data:
+                    project_data["api_connected"] = True
+                    project_data["api_name"] = api.data[0].get("name")
+            except Exception:
+                pass
+
+        # Jurídico deadlines
+        if Features.JURIDICO:
+            try:
+                urgent = (
+                    supabase.table("legal_deadlines")
+                    .select("id", count="exact")
+                    .eq("project_id", p["id"])
+                    .eq("status", "pending")
+                    .lte("deadline_date", str(today + timedelta(days=3)))
+                    .execute()
+                )
+                project_data["urgent_deadlines"] = urgent.count or 0
+
+                all_deadlines = (
+                    supabase.table("legal_deadlines")
+                    .select("id", count="exact")
+                    .eq("project_id", p["id"])
+                    .eq("status", "pending")
+                    .execute()
+                )
+                project_data["deadline_count"] = all_deadlines.count or 0
+
+                templates = (
+                    supabase.table("legal_templates")
+                    .select("id", count="exact")
+                    .eq("project_id", p["id"])
+                    .execute()
+                )
+                project_data["template_count"] = templates.count or 0
+            except Exception:
+                pass
+
+        dashboard_projects.append(project_data)
+
+    total_urgent = sum(p.get("urgent_deadlines", 0) for p in dashboard_projects)
+
+    return {
+        "projects": dashboard_projects,
+        "metrics": {
+            "total_projects": len(dashboard_projects),
+            "urgent_deadlines": total_urgent,
+            "active_today": 0,
+        },
+    }
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)

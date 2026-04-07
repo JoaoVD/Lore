@@ -6,13 +6,15 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import Card from '@/components/ui/Card'
 import { ToastContainer, useToast } from '@/components/ui/Toast'
 import LoreLogo from '@/components/LoreLogo'
 import ReviewModal, { reviewStorageKey } from '@/components/ui/ReviewModal'
-import type { Project } from '@/types'
+import { Features } from '@/lib/features'
+import { DashboardSection } from '@/components/dashboard/DashboardSection'
+import { MetricCard, DocsProjectCard, EstoqProjectCard, LegalProjectCard } from '@/components/dashboard/ProjectCards'
+import type { DashboardProject, Project } from '@/types'
 
-// ── API helper ───────────────────────────────────────────────────────────────
+// ── API helper ────────────────────────────────────────────────────────────────
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000') + '/api'
 
@@ -43,209 +45,49 @@ function slugify(name: string): string {
   return name
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')  // remove acentos
-    .replace(/[^a-z0-9\s-]/g, '')    // remove caracteres especiais
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
     .trim()
-    .replace(/\s+/g, '-')             // espaços viram hífens
-    .replace(/-+/g, '-')              // evita hífens duplos
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
 }
 
 function getInitials(name?: string) {
   if (!name) return '?'
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
+  return name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
 }
 
-// ── Empty State ───────────────────────────────────────────────────────────────
-
-function EmptyState({ onNew }: { onNew: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center gap-6">
-      <div className="relative">
-        <div className="h-24 w-24 rounded-3xl bg-brand-light flex items-center justify-center">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="44"
-            height="44"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#0F6E56"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-            <line x1="12" y1="11" x2="12" y2="17" />
-            <line x1="9" y1="14" x2="15" y2="14" />
-          </svg>
-        </div>
-        <div className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-brand flex items-center justify-center shadow-md">
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </div>
-      </div>
-      <div>
-        <h2 className="text-xl font-bold text-ink" style={{ fontFamily: 'var(--font-serif)' }}>
-          Nenhum projeto ainda
-        </h2>
-        <p className="text-sm text-muted mt-1 max-w-xs leading-relaxed">
-          Crie seu primeiro projeto e comece a fazer perguntas inteligentes sobre seus documentos.
-        </p>
-      </div>
-      <Button size="lg" onClick={onNew}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-        Criar primeiro projeto
-      </Button>
-    </div>
-  )
+function getGreeting() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Bom dia'
+  if (h < 18) return 'Boa tarde'
+  return 'Boa noite'
 }
 
-// ── Project Card ──────────────────────────────────────────────────────────────
-
-function ProjectCard({
-  project,
-  docCount,
-  onDelete,
-}: {
-  project: Project
-  docCount: number | undefined
-  onDelete: (id: string) => void
-}) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
-
-  return (
-    <Card
-      padding="none"
-      shadow
-      className="group flex flex-col hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
-    >
-      {/* Brand accent bar */}
-      <div className="h-1.5 w-full bg-gradient-to-r from-brand to-brand-mid" />
-
-      <div className="flex flex-col gap-3 p-5 flex-1">
-        {/* Header row */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="h-10 w-10 rounded-xl bg-brand-light flex items-center justify-center shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-            </svg>
-          </div>
-
-          {/* Kebab menu */}
-          <div ref={menuRef} className="relative">
-            <button
-              onClick={(e) => { e.preventDefault(); setMenuOpen((p) => !p) }}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-stone hover:text-ink hover:bg-parchment transition-colors opacity-0 group-hover:opacity-100"
-              aria-label="Opções"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" />
-              </svg>
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-9 z-10 w-40 bg-surface border border-stone/50 rounded-xl shadow-lg py-1 text-sm">
-                <button
-                  onClick={() => { setMenuOpen(false); onDelete(project.id) }}
-                  className="w-full text-left px-4 py-2 text-red-500 hover:bg-red-50 transition-colors"
-                >
-                  Excluir projeto
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Name & description */}
-        <div className="flex-1">
-          <h3 className="font-semibold text-ink text-base leading-snug line-clamp-1">
-            {project.name}
-          </h3>
-          {project.description ? (
-            <p className="text-sm text-muted mt-1 leading-relaxed line-clamp-2">
-              {project.description}
-            </p>
-          ) : (
-            <p className="text-sm text-stone mt-1 italic">Sem descrição</p>
-          )}
-        </div>
-
-        {/* Stats */}
-        <div className="flex items-center gap-4 text-xs text-stone pt-1 border-t border-stone/20">
-          <span className="flex items-center gap-1">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
-            </svg>
-            {docCount === undefined ? (
-              <span className="h-3 w-6 bg-stone/30 rounded animate-pulse inline-block" />
-            ) : (
-              `${docCount} doc${docCount !== 1 ? 's' : ''}`
-            )}
-          </span>
-          <span className="flex items-center gap-1">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            {formatDate(project.created_at)}
-          </span>
-        </div>
-      </div>
-
-      {/* Open button */}
-      <div className="px-5 pb-5">
-        <Link href={`/dashboard/${slugify(project.name)}--${project.id}`}>
-          <Button variant="outline" fullWidth size="sm">
-            Abrir projeto
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-            </svg>
-          </Button>
-        </Link>
-      </div>
-    </Card>
-  )
+function getFormattedDate() {
+  return new Date().toLocaleDateString('pt-BR', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
 }
 
 // ── New Project Modal ─────────────────────────────────────────────────────────
 
 function NewProjectModal({
   open,
+  defaultType,
   onClose,
   onCreated,
   token,
 }: {
   open: boolean
+  defaultType?: 'docs' | 'estoq' | 'juridico'
   onClose: () => void
   onCreated: (project: Project) => void
   token: string
 }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [type, setType] = useState<'docs' | 'estoq' | 'juridico'>(defaultType ?? 'docs')
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<{ name?: string }>({})
   const { toasts, toast, close } = useToast()
@@ -255,16 +97,14 @@ function NewProjectModal({
     if (open) {
       setName('')
       setDescription('')
+      setType(defaultType ?? 'docs')
       setErrors({})
       setTimeout(() => inputRef.current?.focus(), 50)
     }
-  }, [open])
+  }, [open, defaultType])
 
-  // Close on Escape
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
     if (open) document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
@@ -279,7 +119,7 @@ function NewProjectModal({
     try {
       const project = await apiFetch<Project>('/projects', token, {
         method: 'POST',
-        body: JSON.stringify({ name: name.trim(), description: description.trim() || null }),
+        body: JSON.stringify({ name: name.trim(), description: description.trim() || null, type }),
       })
       onCreated(project)
       onClose()
@@ -290,59 +130,66 @@ function NewProjectModal({
     }
   }
 
+  const TYPE_LABELS: Record<string, string> = {
+    docs: '📄 Lore Docs',
+    estoq: '📦 Lore Estoq',
+    juridico: '⚖️ Lore Jurídico',
+  }
+
   if (!open) return null
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden
-      />
-
-      {/* Modal */}
-      <div
-        role="dialog"
-        aria-modal
-        aria-label="Novo projeto"
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      >
-        <div className="w-full max-w-[420px] bg-surface rounded-2xl shadow-2xl border border-stone/50 animate-in fade-in slide-in-from-bottom-4 duration-200">
-          {/* Header */}
+      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <div role="dialog" aria-modal aria-label="Novo projeto" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-[440px] bg-surface rounded-2xl shadow-2xl border border-stone/50 animate-in fade-in slide-in-from-bottom-4 duration-200">
           <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-stone/30">
             <div>
               <h2 className="text-lg font-bold text-ink">Novo projeto</h2>
-              <p className="text-sm text-muted mt-0.5">Configure o projeto para começar</p>
+              <p className="text-sm text-muted mt-0.5">Escolha o produto e configure o projeto</p>
             </div>
-            <button
-              onClick={onClose}
-              className="h-8 w-8 flex items-center justify-center rounded-lg text-stone hover:text-ink hover:bg-parchment transition-colors"
-            >
+            <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-stone hover:text-ink hover:bg-parchment transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
+            {/* Type selector */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-ink/70">Produto</label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['docs', ...(Features.ESTOQ ? ['estoq' as const] : []), ...(Features.JURIDICO ? ['juridico' as const] : [])] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setType(t)}
+                    className={`py-2 px-1 text-xs font-medium rounded-xl border transition-colors ${
+                      type === t
+                        ? 'bg-brand text-white border-brand'
+                        : 'bg-white text-ink/60 border-stone/40 hover:border-brand/40'
+                    }`}
+                  >
+                    {TYPE_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <Input
               ref={inputRef}
               id="project-name"
               label="Nome do projeto"
               placeholder="Ex: Contratos 2024"
               value={name}
-              onChange={(e) => {
-                setName(e.target.value)
-                if (errors.name) setErrors({})
-              }}
+              onChange={(e) => { setName(e.target.value); if (errors.name) setErrors({}) }}
               error={errors.name}
               maxLength={120}
             />
 
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="project-desc" className="text-sm font-medium text-ink-soft">
+              <label htmlFor="project-desc" className="text-sm font-medium text-ink/70">
                 Descrição <span className="text-muted font-normal">(opcional)</span>
               </label>
               <textarea
@@ -354,38 +201,26 @@ function NewProjectModal({
                 rows={3}
                 className="w-full rounded-xl border border-stone hover:border-brand/50 bg-surface px-4 py-3 text-sm text-ink placeholder:text-stone resize-none focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all duration-150"
               />
-              <p className="text-xs text-muted text-right">{description.length}/500</p>
             </div>
 
             <div className="flex gap-3 pt-1">
-              <Button type="button" variant="ghost" fullWidth onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button type="submit" loading={loading} fullWidth>
-                Criar projeto
-              </Button>
+              <Button type="button" variant="ghost" fullWidth onClick={onClose}>Cancelar</Button>
+              <Button type="submit" loading={loading} fullWidth>Criar projeto</Button>
             </div>
           </form>
         </div>
       </div>
-
       <ToastContainer toasts={toasts} onClose={close} />
     </>
   )
 }
 
-// ── Delete Confirm Modal ───────────────────────────────────────────────────────
+// ── Delete Modal ───────────────────────────────────────────────────────────────
 
 function DeleteModal({
-  projectName,
-  loading,
-  onConfirm,
-  onClose,
+  projectName, loading, onConfirm, onClose,
 }: {
-  projectName: string
-  loading: boolean
-  onConfirm: () => void
-  onClose: () => void
+  projectName: string; loading: boolean; onConfirm: () => void; onClose: () => void
 }) {
   return (
     <>
@@ -400,26 +235,17 @@ function DeleteModal({
             </div>
             <h3 className="font-bold text-ink text-base">Excluir projeto?</h3>
             <p className="text-sm text-muted leading-relaxed">
-              O projeto <span className="font-semibold text-ink">&quot;{projectName}&quot;</span> e todos os seus documentos serão excluídos permanentemente. Esta ação não pode ser desfeita.
+              O projeto <span className="font-semibold text-ink">&quot;{projectName}&quot;</span> e todos os seus documentos serão excluídos permanentemente.
             </p>
           </div>
           <div className="flex gap-3">
-            <Button variant="ghost" fullWidth onClick={onClose} disabled={loading}>
-              Cancelar
-            </Button>
+            <Button variant="ghost" fullWidth onClick={onClose} disabled={loading}>Cancelar</Button>
             <button
               onClick={onConfirm}
               disabled={loading}
-              className="flex-1 h-11 rounded-xl bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 h-11 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
             >
-              {loading ? (
-                <>
-                  <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Excluindo...
-                </>
-              ) : (
-                'Sim, excluir'
-              )}
+              {loading ? <><span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Excluindo...</> : 'Sim, excluir'}
             </button>
           </div>
         </div>
@@ -428,7 +254,24 @@ function DeleteModal({
   )
 }
 
+// ── Skeleton ───────────────────────────────────────────────────────────────────
+
+export function ProjectGridSkeleton() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="bg-white rounded-2xl border border-stone/30 h-36 animate-pulse" />
+      ))}
+    </div>
+  )
+}
+
 // ── Dashboard Page ────────────────────────────────────────────────────────────
+
+interface DashboardData {
+  projects: DashboardProject[]
+  metrics: { total_projects: number; urgent_deadlines: number; active_today: number }
+}
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -438,40 +281,22 @@ export default function DashboardPage() {
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
   const [token, setToken] = useState('')
-
-  const [projects, setProjects] = useState<Project[]>([])
-  const [docCounts, setDocCounts] = useState<Record<string, number>>({})
+  const [projects, setProjects] = useState<DashboardProject[]>([])
+  const [metrics, setMetrics] = useState({ total_projects: 0, urgent_deadlines: 0, active_today: 0 })
   const [loading, setLoading] = useState(true)
 
+  const [newModalType, setNewModalType] = useState<'docs' | 'estoq' | 'juridico'>('docs')
   const [showNewModal, setShowNewModal] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DashboardProject | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
-
   const [showReviewModal, setShowReviewModal] = useState(false)
   const [reviewUserId, setReviewUserId] = useState('')
 
-  // ── Load session + projects ──────────────────────────────────────────────
-
-  const loadProjects = useCallback(async (accessToken: string) => {
-    const data = await apiFetch<Project[]>('/projects', accessToken)
-    setProjects(data)
-    return data
+  const loadDashboard = useCallback(async (accessToken: string) => {
+    const data = await apiFetch<DashboardData>('/projects/dashboard', accessToken)
+    setProjects(data.projects)
+    setMetrics(data.metrics)
   }, [])
-
-  const loadDocCounts = useCallback(async (projectIds: string[]) => {
-    if (!projectIds.length) return
-    const { data } = await supabase
-      .from('documents')
-      .select('project_id')
-      .in('project_id', projectIds)
-
-    const counts: Record<string, number> = {}
-    projectIds.forEach((id) => { counts[id] = 0 })
-      ; (data ?? []).forEach((row: { project_id: string }) => {
-        counts[row.project_id] = (counts[row.project_id] ?? 0) + 1
-      })
-    setDocCounts(counts)
-  }, [supabase])
 
   useEffect(() => {
     async function init() {
@@ -487,30 +312,30 @@ export default function DashboardPage() {
         'Usuário'
       )
 
-      // Mostrar modal de avaliação após 14 dias de uso
       const uid = session.user.id
-      const createdAt = new Date(session.user.created_at)
-      const daysSince = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24)
-      const alreadyAnswered = localStorage.getItem(reviewStorageKey(uid))
-      if (daysSince >= 14 && !alreadyAnswered) {
+      const daysSince = (Date.now() - new Date(session.user.created_at).getTime()) / 86400000
+      if (daysSince >= 14 && !localStorage.getItem(reviewStorageKey(uid))) {
         setReviewUserId(uid)
         setTimeout(() => setShowReviewModal(true), 1500)
       }
 
       try {
-        const data = await loadProjects(session.access_token)
-        await loadDocCounts(data.map((p) => p.id))
+        await loadDashboard(session.access_token)
       } catch (err: unknown) {
-        toast(err instanceof Error ? err.message : 'Falha ao carregar projetos.', 'error')
+        // Fallback to simple project list if dashboard endpoint not available yet
+        try {
+          const data = await apiFetch<Project[]>('/projects', session.access_token)
+          setProjects(data.map((p) => ({ ...p, document_count: 0 })))
+          setMetrics({ total_projects: data.length, urgent_deadlines: 0, active_today: 0 })
+        } catch {
+          toast(err instanceof Error ? err.message : 'Falha ao carregar projetos.', 'error')
+        }
       } finally {
         setLoading(false)
       }
     }
-
     init()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Handlers ─────────────────────────────────────────────────────────────
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -518,8 +343,9 @@ export default function DashboardPage() {
   }
 
   function handleProjectCreated(project: Project) {
-    setProjects((prev) => [project, ...prev])
-    setDocCounts((prev) => ({ ...prev, [project.id]: 0 }))
+    const dp: DashboardProject = { ...project, document_count: 0 }
+    setProjects((prev) => [dp, ...prev])
+    setMetrics((m) => ({ ...m, total_projects: m.total_projects + 1 }))
     toast(`Projeto "${project.name}" criado com sucesso!`, 'success')
   }
 
@@ -529,11 +355,7 @@ export default function DashboardPage() {
     try {
       await apiFetch(`/projects/${deleteTarget.id}`, token, { method: 'DELETE' })
       setProjects((prev) => prev.filter((p) => p.id !== deleteTarget.id))
-      setDocCounts((prev) => {
-        const next = { ...prev }
-        delete next[deleteTarget.id]
-        return next
-      })
+      setMetrics((m) => ({ ...m, total_projects: Math.max(0, m.total_projects - 1) }))
       toast(`Projeto "${deleteTarget.name}" excluído.`, 'info')
       setDeleteTarget(null)
     } catch (err: unknown) {
@@ -543,7 +365,17 @@ export default function DashboardPage() {
     }
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  function openNew(type: 'docs' | 'estoq' | 'juridico') {
+    setNewModalType(type)
+    setShowNewModal(true)
+  }
+
+  // Group by type — projects without type default to 'docs'
+  const docProjects   = projects.filter((p) => !p.type || p.type === 'docs')
+  const estoqProjects = projects.filter((p) => p.type === 'estoq')
+  const legalProjects = projects.filter((p) => p.type === 'juridico')
+
+  const firstName = userName.split(' ')[0] || 'Usuário'
 
   return (
     <>
@@ -552,34 +384,25 @@ export default function DashboardPage() {
         {/* Header */}
         <header className="sticky top-0 z-30 bg-surface border-b border-stone shadow-sm">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-
-            {/* Logo */}
             <Link href="/dashboard" className="shrink-0">
               <LoreLogo layout="inline" size="h-8 w-8" wordmarkSize="text-lg" />
             </Link>
 
-            {/* Right side */}
             <div className="flex items-center gap-3">
-              {/* User info */}
               <div className="hidden sm:flex items-center gap-2.5">
                 <div className="h-8 w-8 rounded-full bg-brand-light flex items-center justify-center text-xs font-bold text-brand">
                   {getInitials(userName)}
                 </div>
                 <div className="leading-none">
                   <p className="text-sm font-semibold text-ink">{userName}</p>
-                  <p className="text-xs text-muted">{userEmail}</p>
+                  <p className="text-xs text-ink/40">{userEmail}</p>
                 </div>
               </div>
-
-              {/* Mobile avatar */}
               <div className="sm:hidden h-8 w-8 rounded-full bg-brand-light flex items-center justify-center text-xs font-bold text-brand">
                 {getInitials(userName)}
               </div>
 
-              <Link
-                href="/ajuda"
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium text-muted hover:text-ink hover:bg-parchment transition-colors"
-              >
+              <Link href="/ajuda" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium text-ink/50 hover:text-ink hover:bg-parchment transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
                 </svg>
@@ -597,27 +420,18 @@ export default function DashboardPage() {
         </header>
 
         {/* Main */}
-        <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
 
-          {/* Page title row */}
+          {/* Welcome row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div>
-              <h1
-                className="text-2xl font-bold text-ink"
-                style={{ fontFamily: 'var(--font-serif)' }}
-              >
-                Meus projetos
+              <h1 className="text-2xl font-bold text-ink" style={{ fontFamily: 'var(--font-serif)' }}>
+                {getGreeting()}, {firstName} 👋
               </h1>
-              <p className="text-sm text-muted mt-0.5">
-                {loading
-                  ? 'Carregando seus projetos...'
-                  : projects.length === 0
-                    ? 'Você ainda não tem projetos'
-                    : `${projects.length} projeto${projects.length !== 1 ? 's' : ''}`}
-              </p>
+              <p className="text-sm text-ink/50 mt-0.5 capitalize">{getFormattedDate()}</p>
             </div>
             {!loading && (
-              <Button onClick={() => setShowNewModal(true)} size="md">
+              <Button onClick={() => openNew('docs')} size="md">
                 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                   <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
@@ -626,22 +440,99 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Content */}
           {loading ? (
-            <ProjectGridSkeleton />
-          ) : projects.length === 0 ? (
-            <EmptyState onNew={() => setShowNewModal(true)} />
+            <>
+              {/* Metric skeleton */}
+              <div className="grid grid-cols-3 gap-4 mb-10">
+                {[1, 2, 3].map((i) => <div key={i} className="bg-stone/20 rounded-2xl h-24 animate-pulse" />)}
+              </div>
+              <ProjectGridSkeleton />
+            </>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {projects.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  docCount={docCounts[project.id]}
-                  onDelete={(id) => setDeleteTarget(projects.find((p) => p.id === id) ?? null)}
+            <>
+              {/* Metric cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+                <MetricCard value={metrics.total_projects} label="Projetos ativos" color="green" />
+                <MetricCard
+                  value={metrics.urgent_deadlines}
+                  label="Prazos urgentes"
+                  color={metrics.urgent_deadlines > 0 ? 'red' : 'green'}
                 />
-              ))}
-            </div>
+                <MetricCard value={metrics.active_today} label="Ativos hoje" color="blue" />
+              </div>
+
+              {/* Lore Docs — always visible */}
+              <DashboardSection
+                icon="📄"
+                title="Lore Docs"
+                count={docProjects.length}
+                projects={docProjects}
+                newLabel="Novo projeto Docs"
+                onNew={() => openNew('docs')}
+                renderCard={(p) => (
+                  <DocsProjectCard
+                    key={p.id}
+                    project={p}
+                  />
+                )}
+              />
+
+              {/* Lore Estoq — feature flag */}
+              {Features.ESTOQ && (
+                <DashboardSection
+                  icon="📦"
+                  title="Lore Estoq"
+                  count={estoqProjects.length}
+                  projects={estoqProjects}
+                  newLabel="Nova integração Estoq"
+                  onNew={() => openNew('estoq')}
+                  renderCard={(p) => (
+                    <EstoqProjectCard key={p.id} project={p} />
+                  )}
+                />
+              )}
+
+              {/* Lore Jurídico — feature flag */}
+              {Features.JURIDICO && (
+                <DashboardSection
+                  icon="⚖️"
+                  title="Lore Jurídico"
+                  count={legalProjects.length}
+                  projects={legalProjects}
+                  newLabel="Novo projeto Jurídico"
+                  onNew={() => openNew('juridico')}
+                  renderCard={(p) => (
+                    <LegalProjectCard key={p.id} project={p} />
+                  )}
+                />
+              )}
+
+              {/* Empty state — all sections empty */}
+              {projects.length === 0 && (
+                <div className="flex flex-col items-center justify-center gap-6 py-24 text-center">
+                  <div className="h-20 w-20 rounded-3xl bg-brand-light flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                      <line x1="12" y1="11" x2="12" y2="17" /><line x1="9" y1="14" x2="15" y2="14" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-ink" style={{ fontFamily: 'var(--font-serif)' }}>
+                      Nenhum projeto ainda
+                    </h2>
+                    <p className="text-sm text-ink/50 mt-1 max-w-xs leading-relaxed">
+                      Crie seu primeiro projeto e comece a fazer perguntas inteligentes sobre seus documentos.
+                    </p>
+                  </div>
+                  <Button size="lg" onClick={() => openNew('docs')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Criar primeiro projeto
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </main>
       </div>
@@ -649,6 +540,7 @@ export default function DashboardPage() {
       {/* Modals */}
       <NewProjectModal
         open={showNewModal}
+        defaultType={newModalType}
         onClose={() => setShowNewModal(false)}
         onCreated={handleProjectCreated}
         token={token}
@@ -669,34 +561,5 @@ export default function DashboardPage() {
 
       <ToastContainer toasts={toasts} onClose={close} />
     </>
-  )
-}
-
-// ── Inline Skeleton (also used by loading.tsx) ────────────────────────────────
-
-export function ProjectGridSkeleton() {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="bg-surface rounded-2xl border border-stone/50 shadow-sm overflow-hidden">
-          <div className="h-1.5 w-full bg-stone/30" />
-          <div className="p-5 flex flex-col gap-4">
-            <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-xl bg-stone/30 animate-pulse shrink-0" />
-              <div className="flex-1 flex flex-col gap-2 mt-1">
-                <div className="h-4 w-3/4 bg-stone/30 rounded-md animate-pulse" />
-                <div className="h-3 w-full bg-stone/30 rounded-md animate-pulse" />
-                <div className="h-3 w-2/3 bg-stone/30 rounded-md animate-pulse" />
-              </div>
-            </div>
-            <div className="flex gap-3 pt-2 border-t border-stone/20">
-              <div className="h-3 w-16 bg-stone/30 rounded animate-pulse" />
-              <div className="h-3 w-20 bg-stone/30 rounded animate-pulse" />
-            </div>
-            <div className="h-9 w-full bg-stone/30 rounded-xl animate-pulse" />
-          </div>
-        </div>
-      ))}
-    </div>
   )
 }

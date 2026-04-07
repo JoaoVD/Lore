@@ -31,6 +31,18 @@ export interface Project {
   name: string
   description: string | null
   created_at: string
+  type?: 'docs' | 'estoq' | 'juridico'
+}
+
+/** Project enriched with dashboard metrics from /api/projects/dashboard */
+export interface DashboardProject extends Project {
+  document_count?: number
+  question_count?: number
+  api_connected?: boolean
+  api_name?: string
+  urgent_deadlines?: number
+  template_count?: number
+  deadline_count?: number
 }
 
 export interface Subscription {

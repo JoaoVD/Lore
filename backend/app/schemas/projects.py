@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 class ProjectCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     description: str | None = Field(None, max_length=500)
+    type: str | None = Field(None, pattern=r'^(docs|estoq|juridico)$')
 
 
 class ProjectResponse(BaseModel):
