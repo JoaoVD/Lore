@@ -504,6 +504,9 @@ export default function ProjectPage() {
         const projects = await apiFetch<Project[]>('', session.access_token)
         const proj = projects.find((p) => p.id === projectId)
         if (!proj) { router.replace('/dashboard'); return }
+        // Redirect to vertical-specific page
+        if (proj.type === 'juridico') { router.replace(`/project/${projectId}/legal`); return }
+        if (proj.type === 'estoq') { router.replace(`/project/${projectId}/estoq`); return }
         setProject(proj)
 
         // Fetch documents

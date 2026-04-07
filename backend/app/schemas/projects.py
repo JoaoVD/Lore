@@ -17,6 +17,7 @@ class ProjectResponse(BaseModel):
     user_id: str
     name: str
     description: str | None
+    type: str | None = None
     created_at: datetime
 
 
