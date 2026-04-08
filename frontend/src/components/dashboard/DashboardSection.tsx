@@ -1,52 +1,98 @@
-'use client'
+import Link from "next/link"
+import { ProjectCard } from "./ProjectCard"
 
-import type { DashboardProject } from '@/types'
+interface CardProject {
+  id: string
+  name: string
+  type?: string
+  document_count?: number
+  question_count?: number
+  api_connected?: boolean
+  api_name?: string
+  urgent_deadlines?: number
+  template_count?: number
+  deadline_count?: number
+}
 
 interface Props {
   icon: string
   title: string
-  count: number
-  projects: DashboardProject[]
+  projects: CardProject[]
+  type: "docs" | "estoq" | "juridico"
+  loading: boolean
+  newHref: string
   newLabel: string
-  onNew: () => void
-  renderCard: (project: DashboardProject) => React.ReactNode
 }
 
-export function DashboardSection({
-  icon,
-  title,
-  count,
-  projects,
-  newLabel,
-  onNew,
-  renderCard,
-}: Props) {
+export function DashboardSection({ icon, title, projects, type, loading, newHref, newLabel }: Props) {
   return (
-    <div className="mb-10">
-      {/* Section header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{icon}</span>
-          <h2 className="text-base font-bold text-ink">{title}</h2>
-          <span className="text-xs text-ink/40 bg-stone/20 px-2 py-0.5 rounded-full font-medium">
-            {count}
-          </span>
-        </div>
+    <div style={{ marginBottom: "28px" }}>
+      {/* Header da seção */}
+      <div style={{ display: "flex", alignItems: "center", gap: "7px", marginBottom: "10px" }}>
+        <span style={{ fontSize: "13px" }}>{icon}</span>
+        <span style={{ fontSize: "13px", fontWeight: 500, color: "#1a1a1a" }}>{title}</span>
+        <span style={{
+          fontSize: "11px", color: "#888", background: "#e8e6e0",
+          padding: "1px 7px", borderRadius: "99px"
+        }}>{projects.length}</span>
+        {projects.length > 5 && (
+          <Link href={`/app/${type}`} style={{ marginLeft: "auto", fontSize: "12px", color: "#0F6E56", textDecoration: "none" }}>
+            Ver todos →
+          </Link>
+        )}
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {projects.map((p) => renderCard(p))}
-
-        {/* New project card */}
-        <button
-          onClick={onNew}
-          className="group flex flex-col items-center justify-center p-6 border-2 border-dashed border-stone/40 rounded-2xl text-ink/30 hover:border-brand/40 hover:text-brand hover:bg-brand-light/40 transition-all duration-200 min-h-[140px]"
-        >
-          <span className="text-2xl mb-2 transition-transform group-hover:scale-110 duration-200">+</span>
-          <span className="text-sm font-medium">{newLabel}</span>
-        </button>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+        gap: "9px"
+      }}>
+        {loading
+          ? [1, 2].map(i => <SkeletonCard key={i} />)
+          : projects.slice(0, 5).map(p => <ProjectCard key={p.id} project={p} type={type} />)
+        }
+        {/* Card novo */}
+        <Link href={newHref} style={{ textDecoration: "none" }}>
+          <div
+            style={{
+              border: "1.5px dashed #d8d6d0", borderRadius: "12px",
+              display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center",
+              gap: "4px", minHeight: "96px", color: "#888",
+              fontSize: "12px", cursor: "pointer", transition: "all .15s"
+            }}
+            onMouseEnter={e => {
+              const el = e.currentTarget as HTMLElement
+              el.style.borderColor = "#0F6E56"
+              el.style.color = "#0F6E56"
+              el.style.background = "#f5fdf9"
+            }}
+            onMouseLeave={e => {
+              const el = e.currentTarget as HTMLElement
+              el.style.borderColor = "#d8d6d0"
+              el.style.color = "#888"
+              el.style.background = "transparent"
+            }}
+          >
+            <span style={{ fontSize: "18px", fontWeight: 300 }}>+</span>
+            <span>{newLabel}</span>
+          </div>
+        </Link>
       </div>
+    </div>
+  )
+}
+
+function SkeletonCard() {
+  return (
+    <div style={{
+      background: "#fff", border: "0.5px solid #d8d6d0",
+      borderRadius: "12px", padding: "14px 15px", minHeight: "96px",
+      opacity: 0.5
+    }}>
+      <div style={{ width: "30px", height: "30px", background: "#e8e6e0", borderRadius: "8px", marginBottom: "9px" }} />
+      <div style={{ width: "70%", height: "12px", background: "#e8e6e0", borderRadius: "4px" }} />
     </div>
   )
 }
