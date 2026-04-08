@@ -1,3 +1,4 @@
+"use client"
 import Link from "next/link"
 import { ProjectCard } from "./ProjectCard"
 
@@ -18,13 +19,14 @@ interface Props {
   icon: string
   title: string
   projects: CardProject[]
+  onNew?: () => void
   type: "docs" | "estoq" | "juridico"
   loading: boolean
   newHref: string
   newLabel: string
 }
 
-export function DashboardSection({ icon, title, projects, type, loading, newHref, newLabel }: Props) {
+export function DashboardSection({ icon, title, projects, type, loading, newHref, newLabel, onNew }: Props) {
   return (
     <div style={{ marginBottom: "28px" }}>
       {/* Header da seção */}
@@ -53,34 +55,56 @@ export function DashboardSection({ icon, title, projects, type, loading, newHref
           : projects.slice(0, 5).map(p => <ProjectCard key={p.id} project={p} type={type} />)
         }
         {/* Card novo */}
-        <Link href={newHref} style={{ textDecoration: "none" }}>
-          <div
-            style={{
-              border: "1.5px dashed #d8d6d0", borderRadius: "12px",
-              display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center",
-              gap: "4px", minHeight: "96px", color: "#888",
-              fontSize: "12px", cursor: "pointer", transition: "all .15s"
-            }}
-            onMouseEnter={e => {
-              const el = e.currentTarget as HTMLElement
-              el.style.borderColor = "#0F6E56"
-              el.style.color = "#0F6E56"
-              el.style.background = "#f5fdf9"
-            }}
-            onMouseLeave={e => {
-              const el = e.currentTarget as HTMLElement
-              el.style.borderColor = "#d8d6d0"
-              el.style.color = "#888"
-              el.style.background = "transparent"
-            }}
-          >
-            <span style={{ fontSize: "18px", fontWeight: 300 }}>+</span>
-            <span>{newLabel}</span>
-          </div>
-        </Link>
+        <NewCard label={newLabel} href={newHref} onNew={onNew} />
       </div>
     </div>
+  )
+}
+
+const newCardStyle: React.CSSProperties = {
+  border: "1.5px dashed #d8d6d0", borderRadius: "12px",
+  display: "flex", flexDirection: "column",
+  alignItems: "center", justifyContent: "center",
+  gap: "4px", minHeight: "96px", color: "#888",
+  fontSize: "12px", cursor: "pointer", transition: "all .15s",
+  background: "transparent", width: "100%",
+}
+
+function NewCard({ label, href, onNew }: { label: string; href: string; onNew?: () => void }) {
+  const handlers = {
+    onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
+      const el = e.currentTarget as HTMLElement
+      el.style.borderColor = "#0F6E56"
+      el.style.color = "#0F6E56"
+      el.style.background = "#f5fdf9"
+    },
+    onMouseLeave: (e: React.MouseEvent<HTMLElement>) => {
+      const el = e.currentTarget as HTMLElement
+      el.style.borderColor = "#d8d6d0"
+      el.style.color = "#888"
+      el.style.background = "transparent"
+    },
+  }
+
+  const inner = (
+    <>
+      <span style={{ fontSize: "18px", fontWeight: 300 }}>+</span>
+      <span>{label}</span>
+    </>
+  )
+
+  if (onNew) {
+    return (
+      <button onClick={onNew} style={{ ...newCardStyle, border: "1.5px dashed #d8d6d0" }} {...handlers}>
+        {inner}
+      </button>
+    )
+  }
+
+  return (
+    <Link href={href} style={{ textDecoration: "none" }}>
+      <div style={newCardStyle} {...handlers}>{inner}</div>
+    </Link>
   )
 }
 

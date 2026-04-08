@@ -52,17 +52,19 @@ function slugify(name: string): string {
 
 function NewProjectModal({
   open,
+  defaultType = "docs",
   onClose,
   onCreated,
   token,
 }: {
   open: boolean
+  defaultType?: "docs" | "estoq" | "juridico"
   onClose: () => void
   onCreated: (project: Project) => void
   token: string
 }) {
   const [name, setName] = useState("")
-  const [type, setType] = useState<"docs" | "estoq" | "juridico">("docs")
+  const [type, setType] = useState<"docs" | "estoq" | "juridico">(defaultType)
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<{ name?: string }>({})
   const { toasts, toast, close } = useToast()
@@ -70,7 +72,7 @@ function NewProjectModal({
 
   useEffect(() => {
     if (open) {
-      setName(""); setType("docs"); setErrors({})
+      setName(""); setType(defaultType); setErrors({})
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [open])
@@ -197,6 +199,12 @@ export default function Dashboard() {
   const [projects, setProjects] = useState<DashboardProject[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewModal, setShowNewModal] = useState(false)
+  const [newModalType, setNewModalType] = useState<"docs" | "estoq" | "juridico">("docs")
+
+  function openNew(type: "docs" | "estoq" | "juridico") {
+    setNewModalType(type)
+    setShowNewModal(true)
+  }
 
   const loadDashboard = useCallback(async (accessToken: string) => {
     const data = await apiFetch<DashboardData>("/projects/dashboard", accessToken)
@@ -264,7 +272,7 @@ export default function Dashboard() {
             </p>
           </div>
           <button
-            onClick={() => setShowNewModal(true)}
+            onClick={() => openNew("docs")}
             style={{
               background: "#0F6E56", color: "#fff", border: "none",
               padding: "8px 16px", borderRadius: "8px", fontSize: "13px",
@@ -287,6 +295,7 @@ export default function Dashboard() {
           loading={loading}
           newHref="#"
           newLabel="Novo projeto Docs"
+          onNew={() => openNew("docs")}
         />
 
         {/* Seção Lore Estoq */}
@@ -299,6 +308,7 @@ export default function Dashboard() {
             loading={loading}
             newHref="#"
             newLabel="Nova integração"
+            onNew={() => openNew("estoq")}
           />
         )}
 
@@ -312,6 +322,7 @@ export default function Dashboard() {
             loading={loading}
             newHref="#"
             newLabel="Novo projeto Jurídico"
+            onNew={() => openNew("juridico")}
           />
         )}
 
@@ -328,7 +339,7 @@ export default function Dashboard() {
               </p>
             </div>
             <button
-              onClick={() => setShowNewModal(true)}
+              onClick={() => openNew("docs")}
               style={{
                 background: "#0F6E56", color: "#fff", border: "none",
                 padding: "10px 20px", borderRadius: "8px", fontSize: "13px",
@@ -343,6 +354,7 @@ export default function Dashboard() {
 
       <NewProjectModal
         open={showNewModal}
+        defaultType={newModalType}
         onClose={() => setShowNewModal(false)}
         onCreated={handleProjectCreated}
         token={token}
