@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Features } from "@/lib/features"
@@ -118,6 +118,7 @@ function NavItem({ href, icon, dot, label, active }: {
 function UserFooter() {
   const [name, setName] = useState("")
   const [initials, setInitials] = useState("?")
+  const router = useRouter()
 
   useEffect(() => {
     const supabase = createClient()
@@ -135,6 +136,12 @@ function UserFooter() {
     })
   }, [])
 
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.replace("/login")
+  }
+
   return (
     <div style={{ marginTop: "auto", borderTop: "0.5px solid #d8d6d0", paddingTop: "12px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 10px" }}>
@@ -144,11 +151,29 @@ function UserFooter() {
           justifyContent: "center", fontSize: "11px", fontWeight: 500,
           color: "#0F6E56", flexShrink: 0
         }}>{initials}</div>
-        <div style={{ overflow: "hidden" }}>
+        <div style={{ overflow: "hidden", flex: 1 }}>
           <div style={{ fontSize: "12px", fontWeight: 500, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {name || "…"}
           </div>
         </div>
+        <button
+          onClick={handleLogout}
+          title="Sair"
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            padding: "4px", borderRadius: "6px", color: "#888",
+            display: "flex", alignItems: "center", flexShrink: 0,
+            transition: "color .1s"
+          }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#1a1a1a"}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "#888"}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </button>
       </div>
     </div>
   )
