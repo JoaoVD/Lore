@@ -36,37 +36,37 @@ export function Sidebar() {
 
       {/* Nav principal */}
       <NavItem href="/app" icon="⊞" label="Início" active={pathname === "/app"} />
-      <NavItem href="/app/recentes" icon="◷" label="Recentes" active={pathname === "/app/recentes"} />
+      <NavItem href="/app" icon="◷" label="Recentes" active={false} />
 
       {/* Produtos */}
       <NavSection label="Produtos" />
       <NavItem
-        href="/app/docs"
+        href="/docs"
         dot="#0F6E56"
         label="Lore Docs"
-        active={pathname.startsWith("/app/docs")}
+        active={pathname.startsWith("/docs")}
       />
       {Features.ESTOQ && (
         <NavItem
-          href="/app/estoq"
+          href="/estoq"
           dot="#378ADD"
           label="Lore Estoq"
-          active={pathname.startsWith("/app/estoq")}
+          active={pathname.startsWith("/estoq")}
         />
       )}
       {Features.JURIDICO && (
         <NavItem
-          href="/app/juridico"
+          href="/juridico"
           dot="#7F77DD"
           label="Lore Jurídico"
-          active={pathname.startsWith("/app/juridico")}
+          active={pathname.startsWith("/juridico")}
         />
       )}
 
       {/* Conta */}
       <NavSection label="Conta" />
-      <NavItem href="/app/planos" icon="◇" label="Planos" active={pathname === "/app/planos"} />
-      <NavItem href="/app/configuracoes" icon="⚙" label="Configurações" active={pathname === "/app/configuracoes"} />
+      <NavItem href="/billing" icon="◇" label="Planos" active={pathname === "/billing"} />
+      <NavItem href="/ajuda" icon="⚙" label="Ajuda" active={pathname === "/ajuda"} />
 
       {/* User info */}
       <UserFooter />
