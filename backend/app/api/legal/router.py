@@ -3,18 +3,26 @@ app/api/legal/router.py
 ------------------------
 Endpoints do Lore Jurídico — templates jurídicos pré-configurados.
 
-Rotas (caminhos completos definidos aqui):
-  GET  /api/legal/templates                              — lista templates
-  GET  /api/legal/templates/{template_id}               — detalhe do template
-  POST /api/projects/{project_id}/legal/generate        — gera documento
-  GET  /api/projects/{project_id}/legal/documents       — lista documentos gerados
-  POST /api/projects/{project_id}/legal/templates       — cria template customizado
+Rotas:
+  GET  /api/legal/templates
+  GET  /api/legal/templates/{template_id}
+  POST /api/projects/{project_id}/legal/generate
+  GET  /api/projects/{project_id}/legal/documents
+  POST /api/projects/{project_id}/legal/templates
+  GET  /api/projects/{project_id}/legal/documents/{document_id}/export
+  GET  /api/projects/{project_id}/legal/report
+  GET  /api/legal/tribunais
+  POST /api/projects/{project_id}/legal/cases/{case_id}/sync-pje
 """
 
+import io
 import re
+from collections import Counter, defaultdict
+from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from supabase import Client
 
@@ -213,3 +221,252 @@ async def _fill_with_ai(content: str, missing_vars: list, template_name: str) ->
     )
 
     return response.choices[0].message.content
+
+
+# ── Exportação DOCX/PDF (Prompt B) ────────────────────────────────────────────
+
+@router.get("/api/projects/{project_id}/legal/documents/{document_id}/export")
+async def export_document(
+    project_id: str,
+    document_id: str,
+    format: str = Query("docx", regex="^(docx|pdf)$"),
+    user: AuthUser = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Exporta documento jurídico como .docx ou PDF para download."""
+    if not Features.JURIDICO:
+        raise HTTPException(status_code=404, detail="Feature não disponível")
+
+    result = supabase.table("legal_documents") \
+        .select("*").eq("id", document_id).eq("project_id", project_id).execute()
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Documento não encontrado")
+
+    doc = result.data[0]
+    content: str = doc["content"]
+    safe_name = re.sub(r'[\\/:*?"<>|]', "-", doc["name"])
+
+    if format == "docx":
+        buf = _generate_docx(content, doc["name"])
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.docx"'},
+        )
+    else:
+        buf = _generate_pdf(content, doc["name"])
+        return StreamingResponse(
+            buf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.pdf"'},
+        )
+
+
+def _generate_docx(content: str, title: str) -> io.BytesIO:
+    try:
+        from docx import Document
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.shared import Cm, Pt
+    except ImportError:
+        raise HTTPException(status_code=500, detail="python-docx não instalado. Execute: pip install python-docx")
+
+    document = Document()
+    section = document.sections[0]
+    section.page_width  = Cm(21)
+    section.page_height = Cm(29.7)
+    section.left_margin   = Cm(3)
+    section.right_margin  = Cm(2)
+    section.top_margin    = Cm(2)
+    section.bottom_margin = Cm(2)
+
+    style = document.styles["Normal"]
+    style.font.name = "Times New Roman"
+    style.font.size = Pt(12)
+
+    for line in content.split("\n"):
+        if not line.strip():
+            document.add_paragraph()
+            continue
+        para = document.add_paragraph(line)
+        para.paragraph_format.space_after = Pt(0)
+        para.paragraph_format.line_spacing = Pt(24)
+        if line.isupper() or line.startswith(("EXCELENTÍSSIMO", "REQUERENTE", "REQUERIDO")):
+            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    buf = io.BytesIO()
+    document.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def _generate_pdf(content: str, title: str) -> io.BytesIO:
+    try:
+        from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import cm
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+    except ImportError:
+        raise HTTPException(status_code=500, detail="reportlab não instalado. Execute: pip install reportlab")
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=3*cm, rightMargin=2*cm,
+        topMargin=2*cm, bottomMargin=2*cm,
+    )
+
+    styles = getSampleStyleSheet()
+    normal = ParagraphStyle("Legal", parent=styles["Normal"],
+                            fontName="Times-Roman", fontSize=12, leading=24, alignment=TA_JUSTIFY)
+    center = ParagraphStyle("LegalCenter", parent=normal, alignment=TA_CENTER)
+
+    story = []
+    for line in content.split("\n"):
+        if not line.strip():
+            story.append(Spacer(1, 12))
+            continue
+        s = center if line.isupper() else normal
+        story.append(Paragraph(line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"), s))
+
+    doc.build(story)
+    buf.seek(0)
+    return buf
+
+
+# ── Relatório de Atividade (Prompt D) ─────────────────────────────────────────
+
+@router.get("/api/projects/{project_id}/legal/report")
+async def get_legal_report(
+    project_id: str,
+    period: str = Query("30d", regex="^(7d|30d|90d)$"),
+    user: AuthUser = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Retorna relatório de atividade do projeto jurídico no período especificado."""
+    if not Features.JURIDICO:
+        raise HTTPException(status_code=404, detail="Feature não disponível")
+
+    days = {"7d": 7, "30d": 30, "90d": 90}[period]
+    start = (datetime.utcnow() - timedelta(days=days)).isoformat()
+
+    docs = supabase.table("legal_documents") \
+        .select("id, created_at, legal_templates(name)") \
+        .eq("project_id", project_id).gte("created_at", start).execute()
+
+    deadlines = supabase.table("legal_deadlines") \
+        .select("id, status, deadline_date") \
+        .eq("project_id", project_id).gte("created_at", start).execute()
+
+    clients = supabase.table("legal_clients") \
+        .select("id", count="exact").eq("project_id", project_id).execute()
+
+    template_usage = Counter(
+        (d.get("legal_templates") or {}).get("name", "—")
+        for d in docs.data
+    )
+
+    daily: dict = defaultdict(int)
+    for d in docs.data:
+        day = d["created_at"][:10]
+        daily[day] += 1
+
+    dl_data = deadlines.data or []
+    return {
+        "period": period,
+        "summary": {
+            "documents_generated": len(docs.data),
+            "deadlines_met":     len([d for d in dl_data if d["status"] == "done"]),
+            "deadlines_pending": len([d for d in dl_data if d["status"] == "pending"]),
+            "deadlines_overdue": len([d for d in dl_data if d["status"] == "overdue"]),
+            "active_clients":    clients.count or 0,
+        },
+        "top_templates": [
+            {"name": name, "count": count}
+            for name, count in template_usage.most_common(5)
+        ],
+        "daily_documents": [
+            {"date": k, "count": v}
+            for k, v in sorted(daily.items())
+        ],
+    }
+
+
+# ── Integração PJe/e-SAJ (Prompt E) ──────────────────────────────────────────
+
+@router.get("/api/legal/tribunais")
+async def list_tribunais(user: AuthUser = Depends(get_current_user)):
+    """Lista os tribunais suportados para consulta automática."""
+    from app.services.pje_scraper import TRIBUNAIS
+    return {"tribunais": [
+        {"key": k, "name": v["name"], "type": v["type"]}
+        for k, v in TRIBUNAIS.items()
+    ]}
+
+
+@router.post("/api/projects/{project_id}/legal/cases/{case_id}/sync-pje")
+async def sync_case_from_pje(
+    project_id: str,
+    case_id: str,
+    body: dict,
+    user: AuthUser = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Importa prazos do PJe/e-SAJ para um processo específico."""
+    if not Features.JURIDICO:
+        raise HTTPException(status_code=404, detail="Feature não disponível")
+
+    from app.services.pje_scraper import buscar_prazos_processo
+    from datetime import date
+
+    case_result = supabase.table("legal_cases").select("*") \
+        .eq("id", case_id).eq("project_id", project_id).execute()
+
+    if not case_result.data:
+        raise HTTPException(status_code=404, detail="Processo não encontrado")
+
+    case_data = case_result.data[0]
+    processo = case_data.get("process_number")
+    tribunal = body.get("tribunal") or case_data.get("tribunal")
+
+    if not processo:
+        raise HTTPException(status_code=400, detail="Processo sem número cadastrado")
+    if not tribunal:
+        raise HTTPException(status_code=400, detail="Informe o tribunal")
+
+    result = await buscar_prazos_processo(processo, tribunal)
+
+    if result.get("error") and not result.get("prazos"):
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    imported = 0
+    for prazo in result.get("prazos", []):
+        existing = supabase.table("legal_deadlines").select("id") \
+            .eq("project_id", project_id) \
+            .eq("title", prazo["title"]) \
+            .eq("deadline_date", prazo["date"]).execute()
+
+        if not existing.data:
+            supabase.table("legal_deadlines").insert({
+                "project_id":    project_id,
+                "case_id":       case_id,
+                "title":         prazo["title"],
+                "deadline_date": prazo["date"],
+                "category":      prazo["category"],
+                "created_by":    user.id,
+            }).execute()
+            imported += 1
+
+    supabase.table("legal_cases").update({
+        "last_sync": datetime.utcnow().isoformat(),
+        "tribunal":  tribunal,
+    }).eq("id", case_id).execute()
+
+    return {
+        "imported": imported,
+        "found":    len(result.get("prazos", [])),
+        "tribunal": result.get("tribunal"),
+        "processo": processo,
+        "warning":  result.get("error"),
+    }

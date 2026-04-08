@@ -7,6 +7,8 @@ import { ToastContainer, useToast } from '@/components/ui/Toast'
 import { ProjectHeader } from '@/components/project/ProjectHeader'
 import { CreateTemplateModal } from '@/components/legal/CreateTemplateModal'
 import { DeadlinesTab } from '@/components/legal/DeadlinesTab'
+import { ClientsTab } from '@/components/legal/ClientsTab'
+import { ReportTab } from '@/components/legal/ReportTab'
 import type { Project } from '@/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -179,7 +181,7 @@ function FillModal({
 
 // ── Document Result Modal ──────────────────────────────────────────────────────
 
-function DocumentResultModal({ doc, onClose }: { doc: GeneratedDocument; onClose: () => void }) {
+function DocumentResultModal({ doc, onClose, onExport }: { doc: GeneratedDocument; onClose: () => void; onExport: (id: string, format: 'docx' | 'pdf') => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -189,6 +191,14 @@ function DocumentResultModal({ doc, onClose }: { doc: GeneratedDocument; onClose
             <p className="text-xs text-ink/50 mt-0.5">{doc.name}</p>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={() => onExport(doc.id, 'docx')}
+              className="flex items-center gap-1.5 text-xs font-medium text-brand bg-brand-light px-3 py-1.5 rounded-lg hover:bg-brand/20 transition-colors">
+              ⬇ .docx
+            </button>
+            <button onClick={() => onExport(doc.id, 'pdf')}
+              className="flex items-center gap-1.5 text-xs font-medium text-ink/60 bg-stone/20 px-3 py-1.5 rounded-lg hover:bg-stone/30 transition-colors">
+              ⬇ PDF
+            </button>
             <button onClick={() => navigator.clipboard.writeText(doc.content)}
               className="flex items-center gap-1.5 text-xs font-medium text-brand bg-brand-light px-3 py-1.5 rounded-lg hover:bg-brand/20 transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -367,7 +377,7 @@ export default function LegalPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [documents, setDocuments] = useState<GeneratedDocument[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'templates' | 'documents' | 'deadlines' | 'chat'>('templates')
+  const [activeTab, setActiveTab] = useState<'templates' | 'documents' | 'deadlines' | 'clients' | 'report' | 'chat'>('templates')
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [generatedDoc, setGeneratedDoc] = useState<GeneratedDocument | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -410,6 +420,18 @@ export default function LegalPage() {
     init()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  async function handleExport(documentId: string, format: 'docx' | 'pdf') {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/legal/documents/${documentId}/export?format=${format}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) { toast('Erro ao exportar documento.', 'error'); return }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `documento.${format}`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const handleGenerated = useCallback((doc: GeneratedDocument) => {
     setDocuments((prev) => [doc, ...prev])
     setSelectedTemplate(null)
@@ -436,7 +458,9 @@ export default function LegalPage() {
   const TABS = [
     { id: 'templates' as const,  label: `📋 Templates (${templates.length})` },
     { id: 'deadlines' as const,  label: '⏰ Prazos' },
+    { id: 'clients'  as const,   label: '👥 Clientes' },
     { id: 'documents' as const,  label: `📄 Gerados (${documents.length})` },
+    { id: 'report'   as const,   label: '📊 Relatório' },
     { id: 'chat' as const,       label: '💬 Chat' },
   ]
 
@@ -514,6 +538,16 @@ export default function LegalPage() {
             <DeadlinesTab projectId={projectId} token={token} apiBase={API_BASE} />
           )}
 
+          {/* Clients tab */}
+          {activeTab === 'clients' && token && (
+            <ClientsTab projectId={projectId} token={token} apiBase={API_BASE} />
+          )}
+
+          {/* Report tab */}
+          {activeTab === 'report' && token && (
+            <ReportTab projectId={projectId} token={token} apiBase={API_BASE} />
+          )}
+
           {/* Documents tab */}
           {activeTab === 'documents' && (
             documents.length === 0 ? (
@@ -531,16 +565,23 @@ export default function LegalPage() {
             ) : (
               <div className="space-y-3">
                 {documents.map(doc => (
-                  <div key={doc.id} onClick={() => setGeneratedDoc(doc)}
-                    className="bg-white rounded-xl px-5 py-4 border border-stone/30 flex items-center gap-4 hover:border-brand/30 transition-colors cursor-pointer">
-                    <span className="text-2xl shrink-0">📄</span>
-                    <div className="flex-1 min-w-0">
+                  <div key={doc.id}
+                    className="bg-white rounded-xl px-5 py-4 border border-stone/30 flex items-center gap-4 hover:border-brand/30 transition-colors">
+                    <span className="text-2xl shrink-0 cursor-pointer" onClick={() => setGeneratedDoc(doc)}>📄</span>
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setGeneratedDoc(doc)}>
                       <p className="font-semibold text-ink text-sm truncate">{doc.name}</p>
                       <p className="text-xs text-ink/40 mt-0.5">{new Date(doc.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
                     </div>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C8C6BC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button onClick={() => handleExport(doc.id, 'docx')}
+                        className="text-xs font-medium text-brand bg-brand-light px-2.5 py-1.5 rounded-lg hover:bg-brand/20 transition-colors">
+                        ⬇ .docx
+                      </button>
+                      <button onClick={() => handleExport(doc.id, 'pdf')}
+                        className="text-xs font-medium text-ink/60 bg-stone/20 px-2.5 py-1.5 rounded-lg hover:bg-stone/30 transition-colors">
+                        ⬇ PDF
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -557,7 +598,7 @@ export default function LegalPage() {
       {selectedTemplate && token && (
         <FillModal template={selectedTemplate} projectId={projectId} token={token} onClose={() => setSelectedTemplate(null)} onGenerated={handleGenerated} />
       )}
-      {generatedDoc && <DocumentResultModal doc={generatedDoc} onClose={() => setGeneratedDoc(null)} />}
+      {generatedDoc && <DocumentResultModal doc={generatedDoc} onClose={() => setGeneratedDoc(null)} onExport={handleExport} />}
       {showCreateTemplate && token && (
         <CreateTemplateModal projectId={projectId} token={token} categories={categories} onClose={() => setShowCreateTemplate(false)} onSuccess={handleTemplateCreated} />
       )}
