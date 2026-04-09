@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { apiFetch }     from "@/lib/apiFetch"
 import { TrialBanner }  from "@/components/dashboard/TrialBanner"
 import { DeadlineRow }  from "@/components/dashboard/DeadlineRow"
 import { ProjectCard }  from "@/components/dashboard/ProjectCard"
@@ -10,35 +11,6 @@ import { ToastContainer, useToast } from "@/components/ui/Toast"
 import Button  from "@/components/ui/Button"
 import Input   from "@/components/ui/Input"
 import type { DashboardProject, Project } from "@/types"
-
-// ── API helper ────────────────────────────────────────────────────────────────
-
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000") + "/api"
-
-async function apiFetch<T>(path: string, token: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    const detail = body.detail
-    if (res.status === 402 && typeof detail === "object" && detail !== null) {
-      window.dispatchEvent(new CustomEvent("upgrade-required", { detail }))
-    }
-    throw new Error(
-      typeof detail === "object" && detail?.message
-        ? detail.message
-        : (detail ?? `Erro ${res.status}`)
-    )
-  }
-  const text = await res.text()
-  return (text ? JSON.parse(text) : undefined) as T
-}
 
 // ── New Project Modal ─────────────────────────────────────────────────────────
 
