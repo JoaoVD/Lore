@@ -10,6 +10,7 @@ Rotas:
   GET  /api/projects/{project_id}/legal/documents
   POST /api/projects/{project_id}/legal/templates
   GET  /api/projects/{project_id}/legal/documents/{document_id}/export
+  POST /api/projects/{project_id}/legal/documents/{document_id}/feedback
   GET  /api/projects/{project_id}/legal/report
   GET  /api/legal/tribunais
   POST /api/projects/{project_id}/legal/cases/{case_id}/sync-pje
@@ -41,6 +42,30 @@ class GenerateDocumentRequest(BaseModel):
 
 # ── Templates ─────────────────────────────────────────────────────────────────
 
+_AREA_META = {
+    "trabalhista":    {"name": "Trabalhista",     "icon": "⚖️"},
+    "civel":          {"name": "Cível",            "icon": "📋"},
+    "contratos":      {"name": "Contratos",        "icon": "📝"},
+    "familia":        {"name": "Família",           "icon": "👨‍👩‍👧"},
+    "previdenciario": {"name": "Previdenciário",   "icon": "🏛️"},
+}
+
+
+def _normalize_diamond(t: dict) -> dict:
+    """Converte um diamond_template para o shape esperado pelo frontend."""
+    area = t.get("area", "")
+    meta = _AREA_META.get(area, {"name": area.title(), "icon": "📄"})
+    return {
+        **t,
+        # frontend usa 'content' para preview; diamond usa 'structure' — expõe vazio
+        "content": "",
+        "description": f"Padrão Diamante — {meta['name']}",
+        "is_default": True,
+        "legal_template_categories": meta,
+        "category_id": area,
+    }
+
+
 @router.get("/api/legal/templates")
 async def list_templates(
     project_id: Optional[str] = None,
@@ -48,23 +73,32 @@ async def list_templates(
     user: AuthUser = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    """Lista todos os templates disponíveis (padrão + do projeto)."""
+    """Lista todos os templates disponíveis (Padrão Diamante + legados + do projeto)."""
     if not Features.JURIDICO:
         raise HTTPException(status_code=404, detail="Feature não disponível")
 
-    query = supabase.table("legal_templates") \
-        .select("*, legal_template_categories(name, icon)")
-
+    # --- Templates Padrão Diamante (globais + do projeto) ---
+    diamond_query = supabase.table("diamond_templates").select("*")
     if project_id:
-        query = query.or_(f"is_default.eq.true,project_id.eq.{project_id}")
+        diamond_query = diamond_query.or_(f"project_id.is.null,project_id.eq.{project_id}")
     else:
-        query = query.eq("is_default", True)
+        diamond_query = diamond_query.is_("project_id", "null")
+    diamond_result = diamond_query.order("created_at").execute()
+    diamond_templates = [_normalize_diamond(t) for t in (diamond_result.data or [])]
 
+    # --- Templates legados ---
+    legacy_query = supabase.table("legal_templates") \
+        .select("*, legal_template_categories(name, icon)")
+    if project_id:
+        legacy_query = legacy_query.or_(f"is_default.eq.true,project_id.eq.{project_id}")
+    else:
+        legacy_query = legacy_query.eq("is_default", True)
     if category:
-        query = query.eq("legal_template_categories.name", category)
+        legacy_query = legacy_query.eq("legal_template_categories.name", category)
+    legacy_result = legacy_query.order("created_at").execute()
 
-    result = query.order("created_at").execute()
-    return {"templates": result.data}
+    all_templates = diamond_templates + (legacy_result.data or [])
+    return {"templates": all_templates}
 
 
 @router.get("/api/legal/templates/{template_id}")
@@ -97,52 +131,100 @@ async def generate_document(
     user: AuthUser = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    """Gera um documento a partir de um template com as variáveis preenchidas."""
+    """Gera um documento a partir de um template (Padrão Diamante ou legado)."""
     if not Features.JURIDICO:
         raise HTTPException(status_code=404, detail="Feature não disponível")
 
-    template = supabase.table("legal_templates") \
-        .select("*") \
-        .eq("id", body.template_id) \
-        .execute()
+    from app.services.diamond_generator import generate_diamond_document
 
-    if not template.data:
-        raise HTTPException(status_code=404, detail="Template não encontrado")
+    # Tenta Padrão Diamante primeiro
+    diamond = supabase.table("diamond_templates") \
+        .select("*").eq("id", body.template_id).execute()
 
-    template_data = template.data[0]
-    content = template_data["content"]
+    if diamond.data:
+        template_data = diamond.data[0]
+        result = await generate_diamond_document(
+            template=template_data,
+            variables=body.variables,
+            project_id=project_id,
+            supabase=supabase,
+        )
+        content = result["content"]
+    else:
+        # Fallback: template legado com substituição simples + IA opcional
+        legacy = supabase.table("legal_templates") \
+            .select("*").eq("id", body.template_id).execute()
+        if not legacy.data:
+            raise HTTPException(status_code=404, detail="Template não encontrado")
+        template_data = legacy.data[0]
+        content = template_data["content"]
+        for key, value in body.variables.items():
+            content = content.replace(f"{{{{{key}}}}}", str(value))
+        if body.use_ai:
+            remaining = re.findall(r'\{\{(\w+)\}\}', content)
+            if remaining:
+                content = await _fill_with_ai(content, remaining, template_data["name"])
 
-    # Substitui as variáveis no template
-    for key, value in body.variables.items():
-        content = content.replace(f"{{{{{key}}}}}", str(value))
-
-    # Se use_ai=True, usa GPT para preencher campos técnicos vazios
-    if body.use_ai:
-        remaining = re.findall(r'\{\{(\w+)\}\}', content)
-        if remaining:
-            content = await _fill_with_ai(content, remaining, template_data["name"])
-
-    doc_name = (
-        f"{template_data['name']} — "
-        f"{body.variables.get('nome_cliente', body.variables.get('nome_reclamante', 'Documento'))}"
-    )
+    first_var = next(iter(body.variables.values()), "Documento") if body.variables else "Documento"
+    doc_name = f"{template_data['name']} — {first_var}"[:100]
 
     saved = supabase.table("legal_documents").insert({
-        "project_id": project_id,
+        "project_id":  project_id,
         "template_id": body.template_id,
-        "name": doc_name,
-        "content": content,
-        "variables": body.variables,
-        "created_by": user.id,
+        "name":        doc_name,
+        "content":     content,
+        "variables":   body.variables,
+        "created_by":  user.id,
     }).execute()
 
     return {
         "document_id": saved.data[0]["id"],
-        "name": doc_name,
-        "content": content,
-        "variables_filled": len(body.variables),
-        "variables_remaining": len(re.findall(r'\{\{(\w+)\}\}', content)),
+        "name":        doc_name,
+        "content":     content,
+        "variables_filled":     len(body.variables),
+        "variables_remaining":  len(re.findall(r'\{\{(\w+)\}\}', content)),
     }
+
+
+@router.post("/api/projects/{project_id}/legal/documents/{document_id}/feedback")
+async def save_document_feedback(
+    project_id: str,
+    document_id: str,
+    body: dict,
+    user: AuthUser = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """
+    Salva a edição do advogado para o feedback loop.
+    A cada 5 feedbacks, o Lore atualiza o estilo do escritório automaticamente.
+    """
+    if not Features.JURIDICO:
+        raise HTTPException(status_code=404, detail="Feature não disponível")
+
+    from app.services.diamond_generator import save_feedback_and_learn
+
+    original = body.get("original", "")
+    edited   = body.get("edited", "")
+    section  = body.get("section", "geral")
+
+    if not edited or original == edited:
+        return {"message": "Sem alterações detectadas."}
+
+    await save_feedback_and_learn(
+        project_id=project_id,
+        document_id=document_id,
+        section=section,
+        original=original,
+        edited=edited,
+        user_id=user.id,
+        supabase=supabase,
+    )
+
+    # Atualiza o conteúdo do documento salvo
+    supabase.table("legal_documents").update({"content": edited}) \
+        .eq("id", document_id).eq("project_id", project_id).execute()
+
+    return {"message": "Feedback salvo. O Lore está aprendendo com sua edição."}
 
 
 @router.get("/api/projects/{project_id}/legal/documents")

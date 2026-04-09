@@ -12,7 +12,10 @@ supabase==2.4.6
 # Vector DB
 qdrant-client==1.9.1
 
-# AI
+# AI — Motor Padrão Diamante
+anthropic>=0.28.0
+
+# AI — RAG / embeddings (mantido)
 llama-index==0.10.42
 llama-index-llms-openai==0.1.22
 llama-index-embeddings-openai==0.1.11

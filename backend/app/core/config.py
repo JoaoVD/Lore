@@ -22,8 +22,12 @@ class Settings(BaseSettings):
     QDRANT_PORT: int = 6333
     QDRANT_API_KEY: str = ""
 
-    # OpenAI
-    OPENAI_API_KEY: str
+    # Anthropic — Motor Padrão Diamante
+    ANTHROPIC_API_KEY: str = ""
+    CLAUDE_MODEL: str = "claude-sonnet-4-5"
+
+    # OpenAI (mantido para RAG/embeddings e fallback)
+    OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
 

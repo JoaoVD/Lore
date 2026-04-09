@@ -26,6 +26,10 @@ interface Template {
   content: string
   variables: Variable[]
   is_default: boolean
+  is_diamond?: boolean
+  structure?: Record<string, { instrucao: string; exemplo: string }>
+  area?: string
+  tone_guide?: string
   category_id?: string
   legal_template_categories: { id?: string; name: string; icon: string } | null
 }
@@ -107,17 +111,20 @@ function FillModal({
   const [generating, setGenerating] = useState(false)
   const [useAi, setUseAi] = useState(false)
   const { toasts, toast, close } = useToast()
+  const isDiamond = Boolean(template.is_diamond)
 
-  const preview = template.variables.reduce((text, v) => {
-    return text.replace(new RegExp(`\\{\\{${v.key}\\}\\}`, 'g'), values[v.key] || `{{${v.key}}}`)
-  }, template.content)
+  const preview = isDiamond
+    ? null
+    : template.variables.reduce((text, v) => {
+        return text.replace(new RegExp(`\\{\\{${v.key}\\}\\}`, 'g'), values[v.key] || `{{${v.key}}}`)
+      }, template.content)
 
   async function handleGenerate() {
     setGenerating(true)
     try {
       const result = await apiFetch<GeneratedDocument>(
         `/api/projects/${projectId}/legal/generate`, token,
-        { method: 'POST', body: JSON.stringify({ template_id: template.id, variables: values, use_ai: useAi }) }
+        { method: 'POST', body: JSON.stringify({ template_id: template.id, variables: values, use_ai: isDiamond ? false : useAi }) }
       )
       onGenerated(result)
     } catch (err: unknown) {
@@ -132,7 +139,14 @@ function FillModal({
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone/40 shrink-0">
           <div>
-            <h2 className="font-bold text-ink text-lg">{template.name}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-bold text-ink text-lg">{template.name}</h2>
+              {isDiamond && (
+                <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                  ✦ Padrão Diamante
+                </span>
+              )}
+            </div>
             <p className="text-xs text-ink/50 mt-0.5">{template.variables.length} campos para preencher</p>
           </div>
           <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-stone/20 transition-colors">
@@ -155,13 +169,18 @@ function FillModal({
                 )}
               </div>
             ))}
-            <div className="flex items-center gap-2 pt-2">
-              <input id="use-ai" type="checkbox" checked={useAi} onChange={(e) => setUseAi(e.target.checked)} className="accent-brand" />
-              <label htmlFor="use-ai" className="text-xs text-ink/70 cursor-pointer">Preencher campos técnicos vazios com IA</label>
-            </div>
+            {!isDiamond && (
+              <div className="flex items-center gap-2 pt-2">
+                <input id="use-ai" type="checkbox" checked={useAi} onChange={(e) => setUseAi(e.target.checked)} className="accent-brand" />
+                <label htmlFor="use-ai" className="text-xs text-ink/70 cursor-pointer">Preencher campos técnicos vazios com IA</label>
+              </div>
+            )}
             <button onClick={handleGenerate} disabled={generating}
               className="w-full bg-brand text-white text-sm font-semibold px-4 py-3 rounded-xl hover:bg-brand-dark transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-              {generating ? <><span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Gerando...</> : 'Gerar documento'}
+              {generating
+                ? <><span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{isDiamond ? 'Gerando com Claude...' : 'Gerando...'}</>
+                : isDiamond ? '✦ Gerar com Padrão Diamante' : 'Gerar documento'
+              }
             </button>
           </div>
           <div className="hidden md:flex flex-1 flex-col overflow-hidden">
@@ -169,7 +188,24 @@ function FillModal({
               <span className="text-xs font-semibold text-ink/50 uppercase tracking-wide">Preview</span>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-              <pre className="text-xs text-ink/70 leading-relaxed whitespace-pre-wrap font-mono">{preview}</pre>
+              {isDiamond ? (
+                <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+                  <div className="text-4xl">✦</div>
+                  <div>
+                    <p className="font-semibold text-ink">Motor Padrão Diamante</p>
+                    <p className="text-sm text-ink/50 mt-1 max-w-xs leading-relaxed">
+                      Documento gerado seção por seção com escrita jurídica rebuscada e técnica, no padrão dos melhores escritórios brasileiros.
+                    </p>
+                  </div>
+                  {template.tone_guide && (
+                    <p className="text-xs text-ink/40 italic max-w-xs leading-relaxed border-t border-stone/30 pt-3">
+                      {template.tone_guide.slice(0, 180)}…
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <pre className="text-xs text-ink/70 leading-relaxed whitespace-pre-wrap font-mono">{preview}</pre>
+              )}
             </div>
           </div>
         </div>
@@ -179,9 +215,42 @@ function FillModal({
   )
 }
 
-// ── Document Result Modal ──────────────────────────────────────────────────────
+// ── Document Result Modal (com editor + feedback loop) ─────────────────────────
 
-function DocumentResultModal({ doc, onClose, onExport }: { doc: GeneratedDocument; onClose: () => void; onExport: (id: string, format: 'docx' | 'pdf') => void }) {
+function DocumentResultModal({
+  doc, projectId, token, onClose, onExport,
+}: {
+  doc: GeneratedDocument; projectId: string; token: string
+  onClose: () => void; onExport: (id: string, format: 'docx' | 'pdf') => void
+}) {
+  const [editedContent, setEditedContent] = useState(doc.content)
+  const [originalContent] = useState(doc.content)
+  const [saving, setSaving] = useState(false)
+  const [learnedCount, setLearnedCount] = useState(0)
+  const { toasts, toast, close } = useToast()
+
+  const hasEdits = editedContent !== originalContent
+
+  async function handleSaveEdits() {
+    if (!hasEdits) return
+    setSaving(true)
+    try {
+      await apiFetch(
+        `/api/projects/${projectId}/legal/documents/${doc.id}/feedback`, token,
+        {
+          method: 'POST',
+          body: JSON.stringify({ section: 'geral', original: originalContent, edited: editedContent }),
+        }
+      )
+      setLearnedCount(c => c + 1)
+      toast('Edições salvas. O Lore aprendeu com sua revisão!', 'success')
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : 'Erro ao salvar edições.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -199,7 +268,7 @@ function DocumentResultModal({ doc, onClose, onExport }: { doc: GeneratedDocumen
               className="flex items-center gap-1.5 text-xs font-medium text-ink/60 bg-stone/20 px-3 py-1.5 rounded-lg hover:bg-stone/30 transition-colors">
               ⬇ PDF
             </button>
-            <button onClick={() => navigator.clipboard.writeText(doc.content)}
+            <button onClick={() => navigator.clipboard.writeText(editedContent)}
               className="flex items-center gap-1.5 text-xs font-medium text-brand bg-brand-light px-3 py-1.5 rounded-lg hover:bg-brand/20 transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
@@ -213,10 +282,52 @@ function DocumentResultModal({ doc, onClose, onExport }: { doc: GeneratedDocumen
             </button>
           </div>
         </div>
+
+        {/* Editor */}
         <div className="flex-1 overflow-y-auto p-6">
-          <pre className="text-sm text-ink leading-relaxed whitespace-pre-wrap font-mono">{doc.content}</pre>
+          <textarea
+            value={editedContent}
+            onChange={(e) => setEditedContent(e.target.value)}
+            style={{
+              width: '100%',
+              minHeight: '420px',
+              fontFamily: 'Times New Roman, serif',
+              fontSize: '13px',
+              lineHeight: '2',
+              padding: '20px 24px',
+              border: hasEdits ? '1px solid #f59e0b' : '1px solid #e5e3dc',
+              borderRadius: '8px',
+              background: '#fafaf8',
+              resize: 'vertical',
+              outline: 'none',
+            }}
+          />
         </div>
+
+        {/* Barra de feedback loop */}
+        {hasEdits && (
+          <div className="px-6 pb-4 flex items-center justify-between gap-3 shrink-0">
+            <p className="text-xs text-ink/50">
+              Você editou o documento —{' '}
+              {learnedCount > 0
+                ? `o Lore aprendeu ${learnedCount}x com suas revisões nesta sessão`
+                : 'salvar ensina o Lore a escrever no seu estilo'}
+            </p>
+            <button
+              onClick={handleSaveEdits}
+              disabled={saving}
+              className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl transition-colors disabled:opacity-60"
+            >
+              {saving
+                ? <span className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : '💾'
+              }
+              {saving ? 'Salvando...' : 'Salvar edições'}
+            </button>
+          </div>
+        )}
       </div>
+      <ToastContainer toasts={toasts} onClose={close} />
     </div>
   )
 }
@@ -598,7 +709,9 @@ export default function LegalPage() {
       {selectedTemplate && token && (
         <FillModal template={selectedTemplate} projectId={projectId} token={token} onClose={() => setSelectedTemplate(null)} onGenerated={handleGenerated} />
       )}
-      {generatedDoc && <DocumentResultModal doc={generatedDoc} onClose={() => setGeneratedDoc(null)} onExport={handleExport} />}
+      {generatedDoc && token && (
+        <DocumentResultModal doc={generatedDoc} projectId={projectId} token={token} onClose={() => setGeneratedDoc(null)} onExport={handleExport} />
+      )}
       {showCreateTemplate && token && (
         <CreateTemplateModal projectId={projectId} token={token} categories={categories} onClose={() => setShowCreateTemplate(false)} onSuccess={handleTemplateCreated} />
       )}
