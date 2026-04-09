@@ -1,12 +1,12 @@
-import { Sidebar } from "@/components/dashboard/Sidebar"
+import { TopBar } from "@/components/layout/TopBar"
+import { SubNav } from "@/components/layout/SubNav"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#F1EFE8" }}>
-      <Sidebar />
-      <main style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
-        {children}
-      </main>
+    <div style={{ minHeight: "100vh", background: "#F1EFE8" }}>
+      <TopBar />
+      <SubNav />
+      <main>{children}</main>
     </div>
   )
 }
