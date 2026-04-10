@@ -53,12 +53,30 @@ async def create_checkout(
     supabase: Client = Depends(get_supabase),
 ):
     """Cria uma sessão do Stripe Checkout e retorna a URL de redirecionamento."""
-    price_id = PRICE_IDS.get(body.plan, {}).get(body.period)
-    if not price_id:
-        raise HTTPException(status_code=400, detail="Plano ou período inválido")
+    # Normaliza para minúsculo — evita erro por capitalização
+    plan   = body.plan.lower().strip()
+    period = body.period.lower().strip()
+
+    period_map = {
+        "monthly": "monthly", "mensal": "monthly", "month": "monthly",
+        "annual":  "annual",  "anual":  "annual",  "yearly": "annual", "year": "annual",
+    }
+    period = period_map.get(period, period)
+
+    plan_map = {"pro": "pro", "business": "business", "empresarial": "business"}
+    plan = plan_map.get(plan, plan)
+
+    if plan not in ("pro", "business"):
+        raise HTTPException(status_code=400, detail=f"Plano inválido: '{plan}'. Use 'pro' ou 'business'.")
+    if period not in ("monthly", "annual"):
+        raise HTTPException(status_code=400, detail=f"Período inválido: '{period}'. Use 'monthly' ou 'annual'.")
 
     if not stripe.api_key:
         raise HTTPException(status_code=503, detail="Pagamentos não configurados")
+
+    price_id = PRICE_IDS.get(plan, {}).get(period)
+    if not price_id:
+        raise HTTPException(status_code=503, detail=f"Price ID não configurado para {plan}/{period}. Verifique as variáveis de ambiente do Stripe.")
 
     # Busca customer_id existente
     customer_id: str | None = None
@@ -86,14 +104,14 @@ async def create_checkout(
         "cancel_url": f"{FRONTEND_URL}/app/planos?cancelled=true",
         "metadata": {
             "user_id": user.id,
-            "plan":    body.plan,
-            "period":  body.period,
+            "plan":    plan,
+            "period":  period,
             "product": "juridico",
         },
         "subscription_data": {
             "metadata": {
                 "user_id": user.id,
-                "plan":    body.plan,
+                "plan":    plan,
                 "product": "juridico",
             }
         },

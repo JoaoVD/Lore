@@ -97,13 +97,16 @@ export default function PlanosPage() {
   async function handleCheckout(plan: "pro" | "business") {
     if (!token) return
     setLoading(true)
+    console.log("[CHECKOUT] Enviando:", { plan, period })
     try {
       const data = await apiFetch<{ checkout_url: string }>(
         "/billing/checkout", token,
         { method: "POST", body: JSON.stringify({ plan, period }) }
       )
+      console.log("[CHECKOUT] Resposta:", data)
       if (data.checkout_url) window.location.href = data.checkout_url
     } catch (err: unknown) {
+      console.error("[CHECKOUT] Erro:", err)
       alert(err instanceof Error ? err.message : "Erro ao iniciar o checkout.")
     } finally {
       setLoading(false)
