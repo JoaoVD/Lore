@@ -50,7 +50,7 @@ export function TemplateCard({ template }: Props) {
         fontSize: "11px", color: "#888",
         borderTop: "0.5px solid #eeecea", paddingTop: "8px",
       }}>
-        {template.area.charAt(0).toUpperCase() + template.area.slice(1)}
+        {template.area ? template.area.charAt(0).toUpperCase() + template.area.slice(1) : ""}
         {template.subtype && ` · ${template.subtype.charAt(0).toUpperCase() + template.subtype.slice(1)}`}
       </div>
     </div>

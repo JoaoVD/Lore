@@ -8,6 +8,7 @@ Rotas:
   GET /api/subscriptions            → lista todas as assinaturas do usuário
 """
 
+import traceback
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends
@@ -27,28 +28,55 @@ async def get_subscription(
 ):
     """Retorna a assinatura do usuário para um produto específico.
     Na primeira vez, cria automaticamente um trial de 14 dias."""
-    result = (
-        supabase.table("product_subscriptions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("product", product)
-        .execute()
-    )
+    try:
+        result = (
+            supabase.table("product_subscriptions")
+            .select("*")
+            .eq("user_id", str(user.id))
+            .eq("product", product)
+            .execute()
+        )
 
-    if not result.data:
+        if not result.data:
+            trial_ends = (datetime.utcnow() + timedelta(days=14)).isoformat()
+            new_sub = supabase.table("product_subscriptions").insert({
+                "user_id":       str(user.id),
+                "product":       product,
+                "plan":          "trial",
+                "status":        "active",
+                "trial_ends_at": trial_ends,
+            }).execute()
+            data = new_sub.data[0] if new_sub.data else {
+                "plan": "trial", "status": "active", "trial_ends_at": trial_ends
+            }
+        else:
+            data = result.data[0]
+
+        # Calcula dias restantes do trial
+        days_left = 0
+        if data.get("trial_ends_at"):
+            try:
+                end_str = data["trial_ends_at"]
+                if end_str.endswith("Z"):
+                    end_str = end_str[:-1]
+                end = datetime.fromisoformat(end_str)
+                days_left = max(0, (end - datetime.utcnow()).days)
+            except Exception:
+                days_left = 14
+
+        return {**data, "days_left": days_left}
+
+    except Exception:
+        traceback.print_exc()
+        # Retorna trial padrão em vez de 500
         trial_ends = (datetime.utcnow() + timedelta(days=14)).isoformat()
-        new_sub = supabase.table("product_subscriptions").insert({
-            "user_id":       user.id,
-            "product":       product,
+        return {
             "plan":          "trial",
             "status":        "active",
             "trial_ends_at": trial_ends,
-        }).execute()
-        return new_sub.data[0] if new_sub.data else {
-            "plan": "trial", "status": "active"
+            "days_left":     14,
+            "product":       product,
         }
-
-    return result.data[0]
 
 
 @router.get("/subscriptions")
@@ -57,10 +85,14 @@ async def list_subscriptions(
     supabase: Client = Depends(get_supabase),
 ):
     """Lista todas as assinaturas do usuário."""
-    result = (
-        supabase.table("product_subscriptions")
-        .select("*")
-        .eq("user_id", user.id)
-        .execute()
-    )
-    return result.data or []
+    try:
+        result = (
+            supabase.table("product_subscriptions")
+            .select("*")
+            .eq("user_id", str(user.id))
+            .execute()
+        )
+        return result.data or []
+    except Exception:
+        traceback.print_exc()
+        return []

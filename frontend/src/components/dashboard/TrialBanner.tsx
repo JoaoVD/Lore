@@ -1,15 +1,24 @@
 "use client"
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 export function TrialBanner({ product }: { product: string }) {
   const [sub, setSub] = useState<{ plan: string; trial_ends_at: string } | null>(null)
 
   useEffect(() => {
-    fetch(`/api/subscriptions/${product}`)
-      .then(r => r.json())
-      .then(setSub)
-      .catch(() => {})
+    const supabase = createClient()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return
+      fetch(`${API_BASE}/api/subscriptions/${product}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+        .then(r => r.json())
+        .then(setSub)
+        .catch(() => {})
+    })
   }, [product])
 
   if (!sub || sub.plan !== "trial") return null
@@ -26,9 +35,9 @@ export function TrialBanner({ product }: { product: string }) {
       marginBottom: "24px"
     }}>
       <span style={{ fontSize: "12px", color: "#1a1a1a" }}>
-        ⏳ Seu trial do Lore Docs termina em {days} dia{days !== 1 ? "s" : ""} — aproveite todos os recursos!
+        ⏳ Seu trial do Lore Jurídico termina em {days} dia{days !== 1 ? "s" : ""} — aproveite todos os recursos!
       </span>
-      <Link href={`/app/${product}/planos`} style={{
+      <Link href="/app/planos" style={{
         fontSize: "11px", fontWeight: 500, color: "#0F6E56",
         background: "#fff", border: "0.5px solid #9FE1CB",
         padding: "4px 10px", borderRadius: "8px", textDecoration: "none",
