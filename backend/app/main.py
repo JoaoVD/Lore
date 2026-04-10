@@ -13,6 +13,8 @@ from app.api.legal.router import router as legal_router
 from app.api.legal.deadlines import router as deadlines_router
 from app.api.legal.clients import router as legal_clients_router
 from app.api.projects.router import router as projects_router
+from app.api.billing.router import router as billing_router
+from app.api.subscriptions.router import router as subscriptions_router
 from app.api.v1.router import api_router
 from app.core.config import settings
 
@@ -60,6 +62,12 @@ app.include_router(history_router)
 app.include_router(legal_router)
 app.include_router(deadlines_router)
 app.include_router(legal_clients_router)
+
+# Billing — Stripe Checkout, portal e webhook
+app.include_router(billing_router, prefix="/api")
+
+# Subscriptions — status de assinatura por produto
+app.include_router(subscriptions_router, prefix="/api")
 
 
 @app.get("/health", tags=["infra"])
