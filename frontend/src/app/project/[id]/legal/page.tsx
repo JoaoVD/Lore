@@ -110,6 +110,8 @@ function FillModal({
   const [values, setValues] = useState<Record<string, string>>({})
   const [generating, setGenerating] = useState(false)
   const [useAi, setUseAi] = useState(false)
+  const [streamText, setStreamText] = useState("")
+  const [isStreaming, setIsStreaming] = useState(false)
   const { toasts, toast, close } = useToast()
   const isDiamond = Boolean(template.is_diamond)
 
@@ -120,15 +122,74 @@ function FillModal({
       }, template.content)
 
   async function handleGenerate() {
+    if (isDiamond) {
+      await handleGenerateStream()
+    } else {
+      await handleGenerateRegular()
+    }
+  }
+
+  async function handleGenerateRegular() {
     setGenerating(true)
     try {
       const result = await apiFetch<GeneratedDocument>(
         `/api/projects/${projectId}/legal/generate`, token,
-        { method: 'POST', body: JSON.stringify({ template_id: template.id, variables: values, use_ai: isDiamond ? false : useAi }) }
+        { method: 'POST', body: JSON.stringify({ template_id: template.id, variables: values, use_ai: useAi }) }
       )
       onGenerated(result)
     } catch (err: unknown) {
       toast(err instanceof Error ? err.message : 'Erro ao gerar documento.', 'error')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  async function handleGenerateStream() {
+    setGenerating(true)
+    setIsStreaming(true)
+    setStreamText("")
+
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}/legal/generate-stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ template_id: template.id, variables: values }),
+      })
+      if (!res.ok) throw new Error(`Erro ${res.status}`)
+      if (!res.body) throw new Error('Stream não disponível')
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let accumulated = ""
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const event = JSON.parse(line.slice(6))
+            if (event.type === 'chunk') {
+              accumulated += event.text
+              setStreamText(accumulated)
+            } else if (event.type === 'done') {
+              onGenerated({
+                id: event.document_id,
+                name: event.name,
+                content: accumulated,
+                created_at: new Date().toISOString(),
+              })
+            } else if (event.type === 'error') {
+              throw new Error(event.message)
+            }
+          } catch { continue }
+        }
+      }
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : 'Erro ao gerar documento.', 'error')
+      setIsStreaming(false)
     } finally {
       setGenerating(false)
     }
@@ -188,13 +249,34 @@ function FillModal({
               <span className="text-xs font-semibold text-ink/50 uppercase tracking-wide">Preview</span>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-              {isDiamond ? (
+              {isDiamond && isStreaming ? (
+                <div style={{
+                  fontFamily: 'Times New Roman, serif',
+                  fontSize: '13px',
+                  lineHeight: '2',
+                  padding: '8px',
+                  whiteSpace: 'pre-wrap',
+                  color: '#1a1a1a',
+                }}>
+                  {streamText || <span style={{ color: '#aaa', fontFamily: 'system-ui', fontSize: '12px' }}>Gerando documento...</span>}
+                  <span style={{
+                    display: 'inline-block',
+                    width: '2px',
+                    height: '16px',
+                    background: '#0F6E56',
+                    marginLeft: '2px',
+                    animation: 'blink 1s infinite',
+                    verticalAlign: 'middle',
+                  }} />
+                  <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
+                </div>
+              ) : isDiamond ? (
                 <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
                   <div className="text-4xl">✦</div>
                   <div>
                     <p className="font-semibold text-ink">Motor Padrão Diamante</p>
                     <p className="text-sm text-ink/50 mt-1 max-w-xs leading-relaxed">
-                      Documento gerado seção por seção com escrita jurídica rebuscada e técnica, no padrão dos melhores escritórios brasileiros.
+                      Documento gerado com escrita jurídica rebuscada e técnica, no padrão dos melhores escritórios brasileiros.
                     </p>
                   </div>
                   {template.tone_guide && (

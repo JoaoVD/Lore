@@ -17,11 +17,14 @@ Rotas:
 """
 
 import io
+import json
+import os
 import re
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
 
+import anthropic as _anthropic
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -184,6 +187,114 @@ async def generate_document(
         "variables_filled":     len(body.variables),
         "variables_remaining":  len(re.findall(r'\{\{(\w+)\}\}', content)),
     }
+
+
+@router.post("/api/projects/{project_id}/legal/generate-stream")
+async def generate_document_stream(
+    project_id: str,
+    body: GenerateDocumentRequest,
+    user: AuthUser = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """
+    Geração com streaming — o texto aparece em tempo real no frontend.
+    Retorna Server-Sent Events (SSE).
+    """
+    if not Features.JURIDICO:
+        raise HTTPException(status_code=404, detail="Feature não disponível")
+
+    # Busca o template (Diamante ou legado)
+    template_result = supabase.table("diamond_templates").select("*").eq("id", body.template_id).execute()
+    if not template_result.data:
+        template_result = supabase.table("legal_templates").select("*").eq("id", body.template_id).execute()
+    if not template_result.data:
+        raise HTTPException(status_code=404, detail="Template não encontrado")
+
+    template_data = template_result.data[0]
+    variables     = body.variables
+    structure     = template_data.get("structure", {})
+    tone_guide    = template_data.get("tone_guide", "")
+
+    # Estilo aprendido do escritório
+    style = None
+    try:
+        style_result = supabase.table("office_style") \
+            .select("style_summary").eq("project_id", project_id).execute()
+        if style_result.data:
+            style = style_result.data[0].get("style_summary", "")
+    except Exception:
+        pass
+
+    vars_text = "\n".join(
+        f"- {k}: {v}" for k, v in variables.items() if v and str(v).strip()
+    )
+    style_block = f"\nESTILO DO ESCRITÓRIO:\n{style}" if style else ""
+
+    sections_instructions = ""
+    for sec_name, sec_data in structure.items():
+        if isinstance(sec_data, dict) and sec_data.get("instrucao"):
+            sections_instructions += f"\n## {sec_name.upper()}\n{sec_data['instrucao']}\n"
+
+    prompt = (
+        f"Você é um advogado sênior brasileiro com 20 anos de experiência, "
+        f"especialista em {template_data.get('area', 'direito')}.\n\n"
+        f"Gere o documento jurídico completo \"{template_data.get('name')}\" com base nos dados abaixo.\n\n"
+        f"DADOS DO CASO:\n{vars_text}\n\n"
+        f"INSTRUÇÕES POR SEÇÃO:\n{sections_instructions}\n\n"
+        f"TOM E ESTILO:\n{tone_guide}\n"
+        f"{style_block}\n\n"
+        f"REGRAS ABSOLUTAS:\n"
+        f"1. Escrita EXTREMAMENTE formal, técnica e rebuscada\n"
+        f"2. Use: \"ora Reclamante\", \"consoante dispõe\", \"à luz do que preceitua\", "
+        f"\"importa salientar\", \"cumpre destacar\"\n"
+        f"3. Cite legislação específica (CLT, CC, CPC, CF) quando relevante\n"
+        f"4. Use {{{{variavel}}}} para dados não fornecidos — NUNCA invente\n"
+        f"5. Gere o documento COMPLETO do início ao fim\n\n"
+        f"Gere o documento agora:"
+    )
+
+    async def event_stream():
+        client = _anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+        full_text = ""
+        try:
+            async with client.messages.stream(
+                model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-5"),
+                max_tokens=4000,
+                messages=[{"role": "user", "content": prompt}],
+            ) as stream:
+                async for text_chunk in stream.text_stream:
+                    full_text += text_chunk
+                    data = json.dumps({"type": "chunk", "text": text_chunk})
+                    yield f"data: {data}\n\n"
+
+            # Salva no banco após streaming completo
+            first_val  = list(variables.values())[0] if variables else "Documento"
+            doc_name   = f"{template_data['name']} — {first_val}"[:100]
+            saved = supabase.table("legal_documents").insert({
+                "project_id":  project_id,
+                "template_id": body.template_id,
+                "name":        doc_name,
+                "content":     full_text,
+                "variables":   variables,
+                "created_by":  str(user.id),
+            }).execute()
+            doc_id = saved.data[0]["id"] if saved.data else None
+
+            done_data = json.dumps({"type": "done", "document_id": doc_id, "name": doc_name})
+            yield f"data: {done_data}\n\n"
+
+        except Exception as exc:
+            error_data = json.dumps({"type": "error", "message": str(exc)})
+            yield f"data: {error_data}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control":     "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/api/projects/{project_id}/legal/documents/{document_id}/feedback")

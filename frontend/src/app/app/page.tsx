@@ -268,25 +268,20 @@ export default function Dashboard() {
       const full = meta?.full_name || meta?.name || session.user.email?.split("@")[0] || "Usuário"
       setFirstName(full.split(" ")[0])
 
-      try {
-        await loadDashboard(session.access_token)
-      } catch {
-        // fallback: lista simples de projetos
-        try {
-          const data = await apiFetch<Project[]>("/projects", session.access_token)
-          setProjects(data.map(p => ({ ...p, document_count: 0 })))
-        } catch (err: unknown) {
-          toast(err instanceof Error ? err.message : "Falha ao carregar projetos.", "error")
-        }
-      }
-
-      // Templates Padrão Diamante (sem auth — são públicos)
-      try {
-        const tmpl = await apiFetch<{ templates: DiamondTemplate[] }>("/legal/templates", session.access_token)
-        setTemplates(tmpl.templates?.filter(t => t.is_diamond).slice(0, 3) ?? [])
-      } catch {
-        // templates opcionais — não bloqueia o carregamento
-      }
+      // Dashboard + templates em paralelo
+      await Promise.all([
+        loadDashboard(session.access_token).catch(async () => {
+          try {
+            const data = await apiFetch<Project[]>("/projects", session.access_token)
+            setProjects(data.map(p => ({ ...p, document_count: 0 })))
+          } catch (err: unknown) {
+            toast(err instanceof Error ? err.message : "Falha ao carregar projetos.", "error")
+          }
+        }),
+        apiFetch<{ templates: DiamondTemplate[] }>("/legal/templates", session.access_token)
+          .then(tmpl => setTemplates(tmpl.templates?.filter(t => t.is_diamond).slice(0, 3) ?? []))
+          .catch(() => {}),
+      ])
 
       setLoading(false)
     }
@@ -309,11 +304,13 @@ export default function Dashboard() {
     <div style={{
       background: "#fff", border: "0.5px solid #d8d6d0",
       borderRadius: "10px", height: "100px", opacity: 0.4,
+      animation: "pulse 1.5s ease-in-out infinite",
     }} />
   )
 
   return (
     <>
+      <style>{`@keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:0.2} }`}</style>
       <div style={{ maxWidth: "900px", margin: "0 auto", padding: "36px 40px" }}>
 
         {/* Header */}
@@ -341,6 +338,7 @@ export default function Dashboard() {
                 ? [1, 2].map(i => <div key={i} style={{
                     background: "#fff", border: "0.5px solid #d8d6d0",
                     borderRadius: "10px", height: "56px", opacity: 0.4, marginBottom: "7px",
+                    animation: "pulse 1.5s ease-in-out infinite",
                   }} />)
                 : deadlines.map(d => (
                     <DeadlineRow key={d.id} deadline={d} projectId={d.projectId} />
