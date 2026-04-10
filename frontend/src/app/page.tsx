@@ -1,341 +1,465 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
-// ── Reveal animation ──────────────────────────────────────────────────────────
-
-function useReveal() {
-  const ref = useRef<HTMLDivElement>(null)
-  const [visible, setVisible] = useState(false)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect() } }, { threshold: 0.1 })
-    obs.observe(el)
-    return () => obs.disconnect()
-  }, [])
-  return { ref, visible }
+const G = {
+  green:      '#0F6E56',
+  greenDark:  '#085041',
+  greenLight: '#f0f9f5',
+  greenBorder:'#9FE1CB',
+  text:       '#1a1a1a',
+  text2:      '#666666',
+  text3:      '#999999',
+  border:     '#e0ddd6',
+  borderSoft: '#e8e6e0',
+  bg:         '#ffffff',
+  bgAlt:      '#fafaf8',
 }
 
-function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
-  const { ref, visible } = useReveal()
+function Logo({ light = false }: { light?: boolean }) {
   return (
-    <div ref={ref} style={{ opacity: visible ? 1 : 0, transform: visible ? 'none' : 'translateY(18px)', transition: `opacity .5s ${delay}ms, transform .5s ${delay}ms` }}>
-      {children}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+      <div style={{
+        width: 28, height: 28, background: G.green, borderRadius: 6,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 15, color: '#fff',
+        flexShrink: 0,
+      }}>L</div>
+      <span style={{ fontSize: 15, fontWeight: 500, color: light ? '#fff' : G.text, fontFamily: 'system-ui, sans-serif' }}>
+        Lore
+      </span>
     </div>
   )
 }
 
-// ── Navbar ────────────────────────────────────────────────────────────────────
+const FEATURES = [
+  { n: '01', name: 'Templates de elite', desc: 'Petições, contratos e procurações com estrutura modular. Preencha as variáveis e gere o documento em minutos.' },
+  { n: '02', name: 'Controle de prazos', desc: 'Alertas automáticos por e-mail antes do prazo vencer. Nunca mais um prazo processual esquecido.' },
+  { n: '03', name: 'Busca inteligente', desc: 'Qualquer membro da equipe encontra qualquer informação nos documentos do escritório em segundos.' },
+  { n: '04', name: 'Gestão de clientes', desc: 'Cada cliente com seus processos, documentos e prazos organizados e acessíveis com um clique.' },
+  { n: '05', name: 'Exportar .docx e PDF', desc: 'Documentos gerados prontos para protocolar — baixe em .docx ou PDF formatado com um clique.' },
+  { n: '06', name: 'Sincroniza com PJe', desc: 'Importe prazos automaticamente do PJe e e-SAJ pelo número do processo, sem digitação manual.' },
+]
 
-function Navbar() {
-  const [open, setOpen] = useState(false)
+const BEFORE_AFTER = [
+  {
+    before: 'Redigir uma petição do zero leva 40 minutos. O advogado para tudo para fazer isso.',
+    after:  'Template estruturado + IA + documento gerado em 3 minutos, pronto para protocolar.',
+  },
+  {
+    before: 'Prazo processual perdido por falta de controle. Risco de processo disciplinar na OAB.',
+    after:  'E-mail automático 3 dias antes. Toda a equipe vê os prazos no mesmo painel.',
+  },
+  {
+    before: 'Estagiário interrompe o sócio para tirar dúvida sobre honorários ou procedimento interno.',
+    after:  'Qualquer membro encontra a resposta nos documentos do escritório em segundos.',
+  },
+]
+
+const PRO_FEATURES    = ['Templates ilimitados', 'Gestão de prazos + alertas', 'Geração de documentos com IA', 'Exportar .docx e PDF', 'Até 5 usuários']
+const BIZ_FEATURES    = ['Tudo do Pro', 'Usuários ilimitados', 'Sincronização PJe/e-SAJ', 'Relatório de atividade', 'Suporte prioritário']
+
+function FeatureDot({ text }: { text: string }) {
   return (
-    <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: '#fff', borderBottom: '0.5px solid #d8d6d0', height: '56px', display: 'flex', alignItems: 'center', paddingInline: '24px' }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto', width: '100%', display: 'flex', alignItems: 'center', gap: '32px' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+      <div style={{ width: 5, height: 5, borderRadius: '50%', background: G.green, flexShrink: 0, marginTop: 5 }} />
+      <span style={{ fontSize: 12, color: '#555', lineHeight: 1.6, fontFamily: 'system-ui, sans-serif' }}>{text}</span>
+    </div>
+  )
+}
 
-        {/* Logo */}
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '9px', textDecoration: 'none', flexShrink: 0 }}>
-          <div style={{ width: '27px', height: '27px', background: '#0F6E56', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '14px', fontWeight: 700, fontFamily: 'Georgia, serif' }}>L</div>
-          <span style={{ fontSize: '15px', fontWeight: 500, color: '#1a1a1a' }}>Lore</span>
-        </Link>
+export default function LandingPage() {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
-        {/* Links centro — desktop */}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: '28px' }} className="nav-links">
-          {[['Como funciona', '#como-funciona'], ['Funcionalidades', '#funcionalidades'], ['Preços', '#precos']].map(([l, h]) => (
-            <a key={l} href={h} style={{ fontSize: '13px', color: '#1a1a1a', textDecoration: 'none' }}
-              onMouseEnter={e => (e.currentTarget.style.opacity = '.6')}
-              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>{l}</a>
-          ))}
-        </div>
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
-        {/* Direita — desktop */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }} className="nav-links">
-          <Link href="/login" style={{ fontSize: '13px', color: '#1a1a1a', textDecoration: 'none' }}>Entrar</Link>
-          <Link href="/register" style={{ background: '#0F6E56', color: '#fff', fontSize: '13px', fontWeight: 500, padding: '8px 16px', borderRadius: '8px', textDecoration: 'none' }}>Começar grátis</Link>
-        </div>
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+    setMenuOpen(false)
+  }
 
-        {/* Hamburger — mobile */}
-        <button onClick={() => setOpen(o => !o)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#1a1a1a' }} className="nav-burger">☰</button>
-      </div>
+  return (
+    <div style={{ fontFamily: 'system-ui, sans-serif', color: G.text, background: G.bg }}>
+
+      {/* ── NAVBAR ─────────────────────────────────────────────────────────────── */}
+      <nav style={{
+        position: 'sticky', top: 0, zIndex: 100,
+        height: 60, background: '#fff',
+        borderBottom: `0.5px solid ${G.borderSoft}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: isMobile ? '0 24px' : '0 64px',
+      }}>
+        <Link href="/" style={{ textDecoration: 'none' }}><Logo /></Link>
+
+        {!isMobile && (
+          <div style={{ display: 'flex', gap: 28 }}>
+            {['Funcionalidades', 'Como funciona', 'Preços'].map((label, i) => (
+              <button key={label} onClick={() => scrollTo(['funcionalidades', 'antes-depois', 'precos'][i])}
+                style={{ background: 'none', border: 'none', fontSize: 13, color: '#555', cursor: 'pointer', padding: 0, fontFamily: 'system-ui, sans-serif' }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!isMobile && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Link href="/login" style={{
+              background: 'transparent', color: G.text,
+              border: `0.5px solid #d0cec8`, padding: '7px 18px',
+              borderRadius: 6, fontSize: 13, textDecoration: 'none',
+              fontFamily: 'system-ui, sans-serif',
+            }}>Entrar</Link>
+            <Link href="/cadastro" style={{
+              background: G.green, color: '#fff',
+              border: 'none', padding: '7px 18px',
+              borderRadius: 6, fontSize: 13, fontWeight: 500, textDecoration: 'none',
+              fontFamily: 'system-ui, sans-serif',
+            }}>Começar grátis</Link>
+          </div>
+        )}
+
+        {isMobile && (
+          <button onClick={() => setMenuOpen(o => !o)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+            <div style={{ width: 20, height: 1.5, background: G.text, marginBottom: 5 }} />
+            <div style={{ width: 20, height: 1.5, background: G.text, marginBottom: 5 }} />
+            <div style={{ width: 20, height: 1.5, background: G.text }} />
+          </button>
+        )}
+      </nav>
 
       {/* Mobile menu */}
-      {open && (
-        <div style={{ position: 'absolute', top: '56px', left: 0, right: 0, background: '#fff', borderBottom: '0.5px solid #d8d6d0', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '14px', zIndex: 50 }}>
-          {[['Como funciona', '#como-funciona'], ['Funcionalidades', '#funcionalidades'], ['Preços', '#precos']].map(([l, h]) => (
-            <a key={l} href={h} onClick={() => setOpen(false)} style={{ fontSize: '14px', color: '#1a1a1a', textDecoration: 'none' }}>{l}</a>
+      {isMobile && menuOpen && (
+        <div style={{
+          position: 'fixed', top: 60, left: 0, right: 0, zIndex: 99,
+          background: '#fff', borderBottom: `0.5px solid ${G.borderSoft}`,
+          padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16,
+        }}>
+          {['Funcionalidades', 'Como funciona', 'Preços'].map((label, i) => (
+            <button key={label} onClick={() => scrollTo(['funcionalidades', 'antes-depois', 'precos'][i])}
+              style={{ background: 'none', border: 'none', fontSize: 14, color: G.text, cursor: 'pointer', textAlign: 'left', padding: 0, fontFamily: 'system-ui, sans-serif' }}>
+              {label}
+            </button>
           ))}
-          <Link href="/login" style={{ fontSize: '14px', color: '#1a1a1a', textDecoration: 'none' }}>Entrar</Link>
-          <Link href="/register" style={{ background: '#0F6E56', color: '#fff', fontSize: '13px', fontWeight: 500, padding: '10px 16px', borderRadius: '8px', textDecoration: 'none', textAlign: 'center' }}>Começar grátis</Link>
+          <div style={{ borderTop: `0.5px solid ${G.borderSoft}`, paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Link href="/login" onClick={() => setMenuOpen(false)} style={{
+              background: 'transparent', color: G.text, border: `0.5px solid #d0cec8`,
+              padding: '9px 18px', borderRadius: 6, fontSize: 13, textDecoration: 'none',
+              textAlign: 'center', fontFamily: 'system-ui, sans-serif',
+            }}>Entrar</Link>
+            <Link href="/cadastro" onClick={() => setMenuOpen(false)} style={{
+              background: G.green, color: '#fff', border: 'none',
+              padding: '9px 18px', borderRadius: 6, fontSize: 13, fontWeight: 500,
+              textDecoration: 'none', textAlign: 'center', fontFamily: 'system-ui, sans-serif',
+            }}>Começar grátis</Link>
+          </div>
         </div>
       )}
 
-      <style>{`
-        @media (max-width: 640px) { .nav-links { display: none !important; } }
-        @media (min-width: 641px) { .nav-burger { display: none !important; } }
-      `}</style>
-    </nav>
-  )
-}
+      {/* ── HERO ───────────────────────────────────────────────────────────────── */}
+      <section style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '48px 24px' : '88px 64px' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gap: isMobile ? 40 : 64,
+          alignItems: 'center',
+        }}>
+          {/* Left */}
+          <div>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              background: G.greenLight, border: `0.5px solid ${G.greenBorder}`,
+              borderRadius: 99, padding: '4px 12px', marginBottom: 20,
+            }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: G.green }} />
+              <span style={{ fontSize: 11, fontWeight: 500, color: G.greenDark, fontFamily: 'system-ui, sans-serif' }}>
+                Software jurídico com IA
+              </span>
+            </div>
 
-// ── Hero ──────────────────────────────────────────────────────────────────────
+            <h1 style={{
+              fontFamily: 'Georgia, serif', fontSize: isMobile ? 34 : 44,
+              color: G.text, lineHeight: 1.12, marginBottom: 18,
+              fontWeight: 400, margin: '0 0 18px 0',
+            }}>
+              O escritório que trabalha<br />
+              <span style={{ fontWeight: 700 }}>mais inteligente.</span>
+            </h1>
 
-function Hero() {
-  return (
-    <section style={{ padding: '72px 24px', textAlign: 'center', background: '#F1EFE8' }}>
-      <div style={{ maxWidth: '860px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '28px' }}>
-        {/* Badge */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', background: '#E1F5EE', border: '0.5px solid #9FE1CB', borderRadius: '99px', padding: '5px 14px' }}>
-          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0F6E56' }} />
-          <span style={{ fontSize: '12px', color: '#085041', fontWeight: 500 }}>Para escritórios de advocacia</span>
+            <p style={{
+              fontSize: 15, color: G.text2, lineHeight: 1.75,
+              marginBottom: 32, margin: '0 0 32px 0',
+            }}>
+              Templates de elite, controle de prazos com alertas automáticos
+              e busca inteligente nos documentos do escritório. Tudo em uma
+              plataforma feita para advogados brasileiros.
+            </p>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+              <Link href="/cadastro" style={{
+                background: G.green, color: '#fff',
+                padding: '10px 24px', borderRadius: 7, fontSize: 14,
+                fontWeight: 500, textDecoration: 'none', border: 'none',
+                fontFamily: 'system-ui, sans-serif',
+              }}>Começar 14 dias grátis →</Link>
+              <button onClick={() => scrollTo('funcionalidades')} style={{
+                background: '#fff', color: G.text, border: `0.5px solid #d0cec8`,
+                padding: '10px 24px', borderRadius: 7, fontSize: 14,
+                cursor: 'pointer', fontFamily: 'system-ui, sans-serif',
+              }}>Ver demonstração</button>
+            </div>
+
+            <p style={{ fontSize: 11, color: G.text3, margin: 0 }}>
+              Sem cartão de crédito · Cancele quando quiser
+            </p>
+          </div>
+
+          {/* Right — chat mockup */}
+          <div style={{
+            background: G.bgAlt, border: `0.5px solid ${G.border}`,
+            borderRadius: 14, padding: 20,
+          }}>
+            {/* Traffic lights */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+              {['#ff5f56', '#ffbd2e', '#27c93f'].map(c => (
+                <div key={c} style={{ width: 8, height: 8, borderRadius: '50%', background: c }} />
+              ))}
+            </div>
+
+            {/* Header bar */}
+            <div style={{
+              background: '#fff', border: `0.5px solid ${G.borderSoft}`,
+              borderRadius: 8, padding: '8px 12px', marginBottom: 16,
+              fontSize: 11, color: G.text3, textAlign: 'center',
+              fontFamily: 'system-ui, sans-serif',
+            }}>
+              Lore — Assistente Jurídico
+            </div>
+
+            {/* User message */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+              <div style={{
+                background: G.green, color: '#fff',
+                borderRadius: '12px 12px 3px 12px',
+                padding: '9px 13px', fontSize: 12, maxWidth: '85%',
+                fontFamily: 'system-ui, sans-serif', lineHeight: 1.5,
+              }}>
+                Qual a multa por atraso na entrega da RAIS?
+              </div>
+            </div>
+
+            {/* AI response */}
+            <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 10 }}>
+              <div style={{
+                background: '#fff', border: `0.5px solid ${G.borderSoft}`,
+                borderRadius: '3px 12px 12px 12px',
+                padding: '11px 13px', fontSize: 12, color: G.text,
+                lineHeight: 1.6, maxWidth: '92%',
+                fontFamily: 'system-ui, sans-serif',
+              }}>
+                A multa por atraso na entrega da RAIS é de <strong>R$ 425,64</strong> acrescida
+                de R$ 106,40 por bimestre de atraso. Para omissão de informações,
+                a multa é de R$ 425,64 por empregado omitido.
+              </div>
+            </div>
+
+            {/* Sources */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {['manual_tributario.pdf · p.14', 'circular_mte_2024.pdf'].map(tag => (
+                <span key={tag} style={{
+                  background: G.greenLight, borderRadius: 5,
+                  padding: '3px 8px', fontSize: 10, color: G.greenDark,
+                  fontWeight: 500, fontFamily: 'system-ui, sans-serif',
+                }}>{tag}</span>
+              ))}
+            </div>
+          </div>
         </div>
+      </section>
 
-        {/* H1 */}
-        <h1 style={{ fontSize: 'clamp(32px, 5vw, 46px)', fontWeight: 400, color: '#1a1a1a', fontFamily: 'Georgia, serif', lineHeight: 1.15, margin: 0 }}>
-          Seu escritório.<br />
-          Muito mais <em style={{ color: '#0F6E56', fontStyle: 'italic' }}>produtivo.</em>
-        </h1>
+      {/* Divider */}
+      <div style={{ borderTop: `0.5px solid ${G.borderSoft}`, margin: `0 ${isMobile ? '24px' : '64px'}` }} />
 
-        <p style={{ fontSize: '16px', color: '#1a1a1a', maxWidth: '560px', lineHeight: 1.7, margin: 0 }}>
-          Geração de documentos com IA, controle de prazos e busca inteligente
-          nos documentos do escritório — tudo em um lugar.
+      {/* ── FEATURES ───────────────────────────────────────────────────────────── */}
+      <section id="funcionalidades" style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '56px 24px' : '72px 64px' }}>
+        <p style={{ fontSize: 11, color: G.green, textTransform: 'uppercase', letterSpacing: '.1em', margin: '0 0 10px 0', fontWeight: 500 }}>
+          Funcionalidades
+        </p>
+        <h2 style={{
+          fontFamily: 'Georgia, serif', fontSize: isMobile ? 26 : 32,
+          color: G.text, fontWeight: 400, margin: '0 0 48px 0',
+        }}>
+          Tudo que um escritório moderno<br />precisa em um só lugar
+        </h2>
+
+        <div style={{
+          display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          background: G.borderSoft, gap: 1,
+          border: `0.5px solid ${G.borderSoft}`, borderRadius: 12, overflow: 'hidden',
+        }}>
+          {FEATURES.map(f => (
+            <div key={f.n} style={{ background: '#fff', padding: '28px 24px' }}>
+              <div style={{ fontSize: 11, fontWeight: 500, color: G.green, marginBottom: 12, fontFamily: 'system-ui, sans-serif' }}>{f.n}</div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: 14, fontWeight: 500, color: G.text, marginBottom: 8 }}>{f.name}</div>
+              <div style={{ fontSize: 12, color: '#777', lineHeight: 1.65, fontFamily: 'system-ui, sans-serif' }}>{f.desc}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── BEFORE / AFTER ─────────────────────────────────────────────────────── */}
+      <section id="antes-depois" style={{ background: G.green, padding: isMobile ? '56px 24px' : '72px 64px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <h2 style={{
+            fontFamily: 'Georgia, serif', fontSize: isMobile ? 24 : 30,
+            color: '#fff', fontWeight: 400, margin: '0 0 40px 0',
+          }}>
+            O que muda no dia a dia<br />do seu escritório
+          </h2>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+            gap: 16,
+          }}>
+            {BEFORE_AFTER.map((c, i) => (
+              <div key={i} style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: '0.5px solid rgba(255,255,255,0.15)',
+                borderRadius: 10, padding: 20,
+              }}>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '.07em', margin: '0 0 8px 0', fontWeight: 500 }}>Antes</p>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, margin: 0, fontFamily: 'system-ui, sans-serif' }}>{c.before}</p>
+                <div style={{ borderTop: '0.5px solid rgba(255,255,255,0.15)', margin: '14px 0' }} />
+                <p style={{ fontSize: 11, color: G.greenBorder, textTransform: 'uppercase', letterSpacing: '.07em', margin: '0 0 8px 0', fontWeight: 500 }}>Com Lore</p>
+                <p style={{ fontSize: 13, color: '#fff', lineHeight: 1.6, margin: 0, fontFamily: 'system-ui, sans-serif' }}>{c.after}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── PRICING ────────────────────────────────────────────────────────────── */}
+      <section id="precos" style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '56px 24px' : '72px 64px' }}>
+        <p style={{ fontSize: 11, color: G.green, textTransform: 'uppercase', letterSpacing: '.1em', margin: '0 0 10px 0', fontWeight: 500 }}>Planos</p>
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: isMobile ? 26 : 32, color: G.text, fontWeight: 400, margin: '0 0 8px 0' }}>
+          Simples, sem surpresa
+        </h2>
+        <p style={{ fontSize: 14, color: '#777', margin: '0 0 40px 0', fontFamily: 'system-ui, sans-serif' }}>
+          14 dias grátis em qualquer plano. Sem cartão de crédito.
         </p>
 
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <Link href="/register" style={{ background: '#0F6E56', color: '#fff', fontSize: '14px', fontWeight: 500, padding: '12px 24px', borderRadius: '8px', textDecoration: 'none' }}>
-            Começar 14 dias grátis
-          </Link>
-          <a href="#como-funciona" style={{ background: 'transparent', color: '#1a1a1a', fontSize: '14px', fontWeight: 500, padding: '12px 24px', borderRadius: '8px', textDecoration: 'none', border: '0.5px solid #9FE1CB' }}>
-            Ver demonstração
-          </a>
-        </div>
-
-        <p style={{ fontSize: '12px', color: '#888', margin: 0 }}>Sem cartão de crédito · Cancele quando quiser</p>
-      </div>
-    </section>
-  )
-}
-
-// ── Chat Mockup ───────────────────────────────────────────────────────────────
-
-function ChatMockup() {
-  return (
-    <section id="como-funciona" style={{ background: '#F1EFE8', padding: '0 24px 72px' }}>
-      <Reveal>
-        <div style={{ maxWidth: '760px', margin: '0 auto', background: '#fff', border: '0.5px solid #d8d6d0', borderRadius: '14px', overflow: 'hidden' }}>
-          <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #d8d6d0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#0F6E56' }} />
-            <span style={{ fontSize: '12px', color: '#888' }}>Assistente Lore · Escritório</span>
-          </div>
-          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {/* User */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <div style={{ background: '#0F6E56', color: '#fff', padding: '10px 14px', borderRadius: '12px 12px 2px 12px', fontSize: '13px', maxWidth: '75%' }}>
-                Qual a multa por atraso na entrega de RAIS?
-              </div>
-            </div>
-            {/* Assistant */}
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-              <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#0F6E56', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <span style={{ fontFamily: 'Georgia, serif', color: '#fff', fontSize: '13px', fontWeight: 700 }}>L</span>
-              </div>
-              <div style={{ background: '#F8F7F4', padding: '10px 14px', borderRadius: '2px 12px 12px 12px', fontSize: '13px', color: '#1a1a1a', maxWidth: '80%', lineHeight: 1.6 }}>
-                A multa por atraso na entrega da RAIS é de <strong>R$ 425,64</strong>, acrescida de R$ 106,40 por bimestre de atraso ou fração, limitada a 2% do total de salários pagos.
-                <em style={{ color: '#888', display: 'block', marginTop: '6px', fontSize: '12px' }}>(Manual Tributário, p.14)</em>
-                <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
-                  {['manual_tributario.pdf · p.14', 'procedimentos_dp.pdf · p.3'].map(s => (
-                    <span key={s} style={{ background: '#E1F5EE', color: '#085041', fontSize: '11px', padding: '2px 8px', borderRadius: '99px' }}>{s}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Reveal>
-    </section>
-  )
-}
-
-// ── Funcionalidades ───────────────────────────────────────────────────────────
-
-const FEATURES = [
-  { icon: '📋', title: 'Templates jurídicos', desc: 'Petições, contratos e procurações prontos. Preenche as variáveis e gera o documento em segundos.' },
-  { icon: '⏰', title: 'Controle de prazos', desc: 'Alertas automáticos por e-mail antes do prazo vencer. Nunca mais prazo esquecido.' },
-  { icon: '💬', title: 'Busca inteligente', desc: 'Sobe os documentos do escritório e qualquer membro da equipe encontra qualquer informação em segundos.' },
-  { icon: '👥', title: 'Gestão de clientes', desc: 'Cada cliente com seus processos, documentos e prazos organizados em um só lugar.' },
-  { icon: '⬇️', title: 'Exportar .docx e PDF', desc: 'Documentos gerados prontos para protocolar — baixa em .docx ou PDF com um clique.' },
-  { icon: '🔄', title: 'Sincroniza com PJe', desc: 'Importa prazos automaticamente do PJe e e-SAJ pelo número do processo.' },
-]
-
-function Features() {
-  return (
-    <section id="funcionalidades" style={{ background: '#fff', padding: '72px 24px' }}>
-      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-        <Reveal>
-          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-            <p style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '10px', margin: '0 0 10px' }}>FUNCIONALIDADES</p>
-            <h2 style={{ fontSize: 'clamp(24px, 3.5vw, 32px)', fontWeight: 400, color: '#1a1a1a', fontFamily: 'Georgia, serif', margin: 0 }}>
-              Tudo que seu escritório precisa em um lugar
-            </h2>
-          </div>
-        </Reveal>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-          {FEATURES.map((f, i) => (
-            <Reveal key={f.title} delay={i * 60}>
-              <div style={{ background: '#fff', border: '0.5px solid #d8d6d0', borderRadius: '12px', padding: '22px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ width: '32px', height: '32px', background: '#E1F5EE', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>{f.icon}</div>
-                <p style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a', margin: 0 }}>{f.title}</p>
-                <p style={{ fontSize: '13px', color: '#1a1a1a', lineHeight: 1.6, margin: 0 }}>{f.desc}</p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// ── Antes e Depois ────────────────────────────────────────────────────────────
-
-const COMPARISONS = [
-  { before: 'Redigir uma petição do zero leva 40 minutos.', after: 'Template pronto + variáveis preenchidas + documento gerado em 3 minutos.' },
-  { before: 'Prazo processual perdido por falta de controle. Risco disciplinar na OAB.', after: 'E-mail automático 3 dias antes. Toda a equipe vê os prazos no mesmo painel.' },
-  { before: 'Estagiário interrompe o sócio para tirar dúvida sobre honorários.', after: 'Qualquer membro encontra a resposta nos documentos do escritório em segundos.' },
-]
-
-function BeforeAfter() {
-  return (
-    <section style={{ background: '#F1EFE8', padding: '72px 24px' }}>
-      <div style={{ maxWidth: '860px', margin: '0 auto' }}>
-        <Reveal>
-          <h2 style={{ fontSize: 'clamp(22px, 3vw, 30px)', fontWeight: 400, color: '#1a1a1a', fontFamily: 'Georgia, serif', textAlign: 'center', marginBottom: '48px' }}>
-            Antes e depois do Lore no escritório
-          </h2>
-        </Reveal>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {COMPARISONS.map((c, i) => (
-            <Reveal key={i} delay={i * 80}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
-                <div style={{ background: '#FCEBEB', border: '0.5px solid #f5c6c6', borderRadius: '10px', padding: '16px' }}>
-                  <p style={{ fontSize: '10px', fontWeight: 600, color: '#791F1F', textTransform: 'uppercase', letterSpacing: '.07em', margin: '0 0 6px' }}>ANTES</p>
-                  <p style={{ fontSize: '13px', color: '#791F1F', margin: 0, lineHeight: 1.5 }}>{c.before}</p>
-                </div>
-                <span style={{ fontSize: '18px', color: '#888' }}>→</span>
-                <div style={{ background: '#E1F5EE', border: '0.5px solid #9FE1CB', borderRadius: '10px', padding: '16px' }}>
-                  <p style={{ fontSize: '10px', fontWeight: 600, color: '#085041', textTransform: 'uppercase', letterSpacing: '.07em', margin: '0 0 6px' }}>DEPOIS</p>
-                  <p style={{ fontSize: '13px', color: '#085041', margin: 0, lineHeight: 1.5 }}>{c.after}</p>
-                </div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// ── Preços ────────────────────────────────────────────────────────────────────
-
-function Pricing() {
-  return (
-    <section id="precos" style={{ background: '#fff', padding: '72px 24px' }}>
-      <div style={{ maxWidth: '760px', margin: '0 auto' }}>
-        <Reveal>
-          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-            <h2 style={{ fontSize: 'clamp(22px, 3vw, 30px)', fontWeight: 400, color: '#1a1a1a', fontFamily: 'Georgia, serif', margin: '0 0 8px' }}>
-              Planos simples, sem surpresa
-            </h2>
-            <p style={{ fontSize: '14px', color: '#1a1a1a', margin: 0 }}>14 dias grátis em qualquer plano. Sem cartão de crédito.</p>
-          </div>
-        </Reveal>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+          gap: 16, maxWidth: 700,
+        }}>
           {/* Pro */}
-          <Reveal delay={0}>
-            <div style={{ border: '0.5px solid #d8d6d0', borderRadius: '14px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div>
-                <p style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a', margin: '0 0 8px' }}>Pro</p>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                  <span style={{ fontSize: '13px', color: '#0F6E56', fontWeight: 600 }}>R$</span>
-                  <span style={{ fontSize: '32px', fontWeight: 600, color: '#1a1a1a', lineHeight: 1 }}>247</span>
-                  <span style={{ fontSize: '13px', color: '#888' }}>/mês</span>
-                </div>
-                <p style={{ fontSize: '12px', color: '#888', margin: '4px 0 0' }}>14 dias grátis</p>
-              </div>
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {['Templates ilimitados', 'Gestão de prazos + alertas', 'Geração de documentos IA', 'Exportar .docx e PDF', 'Até 5 usuários'].map(f => (
-                  <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#1a1a1a' }}>
-                    <span style={{ color: '#0F6E56', fontWeight: 700 }}>✓</span> {f}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/register" style={{ display: 'block', background: '#0F6E56', color: '#fff', fontSize: '13px', fontWeight: 500, padding: '12px', borderRadius: '8px', textDecoration: 'none', textAlign: 'center' }}>
-                Começar grátis
-              </Link>
+          <div style={{ border: `0.5px solid ${G.border}`, borderRadius: 12, padding: 24, background: '#fff' }}>
+            <div style={{ fontSize: 14, fontWeight: 500, color: G.text, marginBottom: 16, fontFamily: 'system-ui, sans-serif' }}>Pro</div>
+            <div style={{ marginBottom: 4 }}>
+              <span style={{ fontFamily: 'Georgia, serif', fontSize: 32, color: G.text }}>R$ 247</span>
+              <span style={{ fontSize: 14, color: G.text3 }}>/mês</span>
             </div>
-          </Reveal>
+            <div style={{ fontSize: 11, color: G.text3, marginBottom: 20, fontFamily: 'system-ui, sans-serif' }}>14 dias grátis</div>
+            <div style={{ marginBottom: 24 }}>{PRO_FEATURES.map(f => <FeatureDot key={f} text={f} />)}</div>
+            <Link href="/cadastro?plan=pro" style={{
+              display: 'block', textAlign: 'center',
+              background: '#fff', color: G.text,
+              border: `0.5px solid #d0cec8`, padding: '10px',
+              borderRadius: 7, fontSize: 13, fontWeight: 500,
+              textDecoration: 'none', fontFamily: 'system-ui, sans-serif',
+            }}>Começar grátis</Link>
+          </div>
+
           {/* Business */}
-          <Reveal delay={80}>
-            <div style={{ border: '2px solid #0F6E56', borderRadius: '14px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative' }}>
-              <div style={{ position: 'absolute', top: '-12px', left: '20px', background: '#E1F5EE', border: '0.5px solid #9FE1CB', borderRadius: '99px', padding: '3px 10px' }}>
-                <span style={{ fontSize: '11px', color: '#085041', fontWeight: 500 }}>Mais popular</span>
-              </div>
-              <div>
-                <p style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a', margin: '0 0 8px' }}>Business</p>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                  <span style={{ fontSize: '13px', color: '#0F6E56', fontWeight: 600 }}>R$</span>
-                  <span style={{ fontSize: '32px', fontWeight: 600, color: '#1a1a1a', lineHeight: 1 }}>397</span>
-                  <span style={{ fontSize: '13px', color: '#888' }}>/mês</span>
-                </div>
-                <p style={{ fontSize: '12px', color: '#888', margin: '4px 0 0' }}>14 dias grátis</p>
-              </div>
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {['Tudo do Pro', 'Usuários ilimitados', 'Sincronização com PJe/e-SAJ', 'Relatório de atividade', 'Suporte prioritário'].map(f => (
-                  <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#1a1a1a' }}>
-                    <span style={{ color: '#0F6E56', fontWeight: 700 }}>✓</span> {f}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/register" style={{ display: 'block', background: '#0F6E56', color: '#fff', fontSize: '13px', fontWeight: 500, padding: '12px', borderRadius: '8px', textDecoration: 'none', textAlign: 'center' }}>
-                Começar grátis
-              </Link>
+          <div style={{ border: `1.5px solid ${G.green}`, borderRadius: 12, padding: 24, background: '#fff' }}>
+            <div style={{
+              display: 'inline-block',
+              background: G.greenLight, color: G.greenDark,
+              fontSize: 10, fontWeight: 500, padding: '2px 8px',
+              borderRadius: 99, marginBottom: 10, fontFamily: 'system-ui, sans-serif',
+            }}>Mais completo</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: G.text, marginBottom: 16, fontFamily: 'system-ui, sans-serif' }}>Business</div>
+            <div style={{ marginBottom: 4 }}>
+              <span style={{ fontFamily: 'Georgia, serif', fontSize: 32, color: G.text }}>R$ 397</span>
+              <span style={{ fontSize: 14, color: G.text3 }}>/mês</span>
             </div>
-          </Reveal>
+            <div style={{ fontSize: 11, color: G.text3, marginBottom: 20, fontFamily: 'system-ui, sans-serif' }}>14 dias grátis</div>
+            <div style={{ marginBottom: 24 }}>{BIZ_FEATURES.map(f => <FeatureDot key={f} text={f} />)}</div>
+            <Link href="/cadastro?plan=business" style={{
+              display: 'block', textAlign: 'center',
+              background: G.green, color: '#fff',
+              border: 'none', padding: '10px',
+              borderRadius: 7, fontSize: 13, fontWeight: 500,
+              textDecoration: 'none', fontFamily: 'system-ui, sans-serif',
+            }}>Começar grátis</Link>
+          </div>
         </div>
-      </div>
-    </section>
-  )
-}
+      </section>
 
-// ── Footer ────────────────────────────────────────────────────────────────────
+      {/* ── CTA FINAL ──────────────────────────────────────────────────────────── */}
+      <section style={{
+        background: '#1a1a1a', padding: isMobile ? '64px 24px' : '80px 64px',
+        textAlign: 'center',
+      }}>
+        <h2 style={{
+          fontFamily: 'Georgia, serif', fontSize: isMobile ? 28 : 36,
+          color: '#fff', fontWeight: 400, margin: '0 0 16px 0',
+        }}>
+          Pronto para modernizar seu escritório?
+        </h2>
+        <p style={{ fontSize: 15, color: '#888', margin: '0 0 36px 0', fontFamily: 'system-ui, sans-serif' }}>
+          Junte-se a advogados que já trabalham de forma mais inteligente.
+        </p>
+        <Link href="/cadastro" style={{
+          display: 'inline-block',
+          background: G.green, color: '#fff',
+          padding: '12px 32px', borderRadius: 7,
+          fontSize: 15, fontWeight: 500, textDecoration: 'none',
+          fontFamily: 'system-ui, sans-serif',
+        }}>Começar 14 dias grátis</Link>
+        <p style={{ fontSize: 12, color: '#666', marginTop: 12, fontFamily: 'system-ui, sans-serif' }}>
+          Sem cartão de crédito · Cancele quando quiser
+        </p>
+      </section>
 
-function Footer() {
-  return (
-    <footer style={{ background: '#fff', borderTop: '0.5px solid #d8d6d0', padding: '20px 24px' }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-        <span style={{ fontSize: '13px', color: '#1a1a1a' }}>Lore · Para escritórios de advocacia · uselore.com.br</span>
-        <div style={{ display: 'flex', gap: '20px' }}>
-          {[['Termos', '/terms'], ['Privacidade', '/privacy'], ['Contato', '/contact']].map(([label, href]) => (
-            <Link key={label} href={href} style={{ fontSize: '13px', color: '#1a1a1a', textDecoration: 'none' }}>{label}</Link>
+      {/* ── FOOTER ─────────────────────────────────────────────────────────────── */}
+      <footer style={{
+        background: '#1a1a1a', borderTop: '0.5px solid #2a2a2a',
+        padding: isMobile ? '32px 24px' : '40px 64px',
+        display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+        justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center',
+        gap: isMobile ? 20 : 0,
+      }}>
+        <div>
+          <Logo light />
+          <p style={{ fontSize: 11, color: '#666', marginTop: 6, margin: '6px 0 0 0', fontFamily: 'system-ui, sans-serif' }}>
+            Software jurídico para advogados brasileiros
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+          {[
+            { label: 'Termos de Uso', href: '/termos' },
+            { label: 'Política de Privacidade', href: '/privacidade' },
+            { label: 'Contato', href: 'mailto:contato@uselore.com.br' },
+          ].map(l => (
+            <Link key={l.label} href={l.href} style={{
+              fontSize: 12, color: '#888', textDecoration: 'none',
+              fontFamily: 'system-ui, sans-serif',
+            }}>{l.label}</Link>
           ))}
         </div>
-      </div>
-    </footer>
-  )
-}
+      </footer>
 
-// ── Page ──────────────────────────────────────────────────────────────────────
-
-export default function LandingPage() {
-  return (
-    <>
-      <Navbar />
-      <Hero />
-      <ChatMockup />
-      <Features />
-      <BeforeAfter />
-      <Pricing />
-      <Footer />
-    </>
+    </div>
   )
 }
