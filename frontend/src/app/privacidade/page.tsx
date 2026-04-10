@@ -49,7 +49,7 @@ export default function PrivacidadePage() {
       </p>
 
       <Section title="1. Introdução">
-        <p>O Lore ("nós", "nosso") está comprometido com a proteção da privacidade dos seus Usuários. Esta Política descreve como coletamos, usamos, armazenamos e protegemos suas informações pessoais, em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — "LGPD").</p>
+        <p>O Lore (&quot;nós&quot;, &quot;nosso&quot;) está comprometido com a proteção da privacidade dos seus Usuários. Esta Política descreve como coletamos, usamos, armazenamos e protegemos suas informações pessoais, em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — &quot;LGPD&quot;).</p>
       </Section>
 
       <Section title="2. Dados Coletados">

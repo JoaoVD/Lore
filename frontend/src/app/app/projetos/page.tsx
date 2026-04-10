@@ -18,7 +18,7 @@ export default function ProjetosPage() {
   const router  = useRouter()
   const supabase = createClient()
 
-  const [token,    setToken]    = useState("")
+  const [_token,   setToken]    = useState("")
   const [projects, setProjects] = useState<DashboardProject[]>([])
   const [loading,  setLoading]  = useState(true)
 

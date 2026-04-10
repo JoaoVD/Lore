@@ -49,7 +49,7 @@ export default function TermosPage() {
       </p>
 
       <Section title="1. Aceitação dos Termos">
-        <p>Ao acessar ou utilizar a plataforma Lore ("Plataforma"), operada por João Vitor Dalseno ("Lore", "nós"), você ("Usuário") concorda com estes Termos de Uso. Caso não concorde, não utilize a Plataforma.</p>
+        <p>Ao acessar ou utilizar a plataforma Lore (&quot;Plataforma&quot;), operada por João Vitor Dalseno (&quot;Lore&quot;, &quot;nós&quot;), você (&quot;Usuário&quot;) concorda com estes Termos de Uso. Caso não concorde, não utilize a Plataforma.</p>
       </Section>
 
       <Section title="2. Descrição do Serviço">
